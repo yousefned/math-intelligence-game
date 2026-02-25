@@ -1,322 +1,625 @@
-const scoreEl = document.getElementById("score");
-const timeEl = document.getElementById("time");
-const levelEl = document.getElementById("level");
-const streakEl = document.getElementById("streak");
-const questionEl = document.getElementById("question");
-const answerInput = document.getElementById("answer");
-const checkBtn = document.getElementById("checkBtn");
-const startBtn = document.getElementById("startBtn");
-const feedbackEl = document.getElementById("feedback");
-const soundBtn = document.getElementById("soundBtn");
-const ringProgress = document.querySelector(".ring-progress");
-const timerRing = document.querySelector(".timer-ring");
-const flashEl = document.getElementById("flash");
-const levelUpEl = document.getElementById("levelUp");
+// Neon Protocol: Mission-based math gameplay
 
-const TOTAL_TIME = 60;
-const RING_CIRCUMFERENCE = 326;
-
-let score = 0;
-let level = 1;
-let timeLeft = TOTAL_TIME;
-let correctAnswer = null;
-let timerId = null;
-let isRunning = false;
-let streak = 0;
-let soundEnabled = false;
-
-const operators = ["+", "-", "*", "/", "^"];
-const difficultyRanges = {
-  easy: 20,
-  medium: 60,
-  hard: 150,
+const ui = {
+  app: document.getElementById("app"),
+  intro: document.getElementById("intro"),
+  game: document.getElementById("game"),
+  startMissionBtn: document.getElementById("startMissionBtn"),
+  hudMission: document.getElementById("hudMission"),
+  hudObjective: document.getElementById("hudObjective"),
+  hudScore: document.getElementById("hudScore"),
+  hudTime: document.getElementById("hudTime"),
+  hudStreak: document.getElementById("hudStreak"),
+  questionText: document.getElementById("questionText"),
+  questionCard: document.getElementById("questionCard"),
+  answerInput: document.getElementById("answerInput"),
+  submitAnswer: document.getElementById("submitAnswer"),
+  choiceRow: document.getElementById("choiceRow"),
+  eventBanner: document.getElementById("eventBanner"),
+  missionProgress: document.getElementById("missionProgress"),
+  progressText: document.getElementById("progressText"),
+  missionList: document.getElementById("missionList"),
+  missionTip: document.getElementById("missionTip"),
+  missionComplete: document.getElementById("missionComplete"),
+  missionSummary: document.getElementById("missionSummary"),
+  nextMission: document.getElementById("nextMission"),
+  soundToggle: document.getElementById("soundToggle"),
+  themeToggle: document.getElementById("themeToggle"),
+  flash: document.getElementById("flash"),
+  powerTime: document.getElementById("powerTime"),
+  powerDouble: document.getElementById("powerDouble"),
+  powerSkip: document.getElementById("powerSkip"),
+  powerTimeCount: document.getElementById("powerTimeCount"),
+  powerDoubleCount: document.getElementById("powerDoubleCount"),
+  powerSkipCount: document.getElementById("powerSkipCount"),
+  difficultyButtons: Array.from(document.querySelectorAll(".segment")),
+  choiceButtons: Array.from(document.querySelectorAll(".choice-row .chip")),
 };
 
-const sounds = {};
+const missions = [
+  {
+    name: "Boot Sequence",
+    type: "equation",
+    target: 5,
+    time: 30,
+    objective: "Solve 5 equations in 30s",
+    tip: "Focus on accuracy to build your combo multiplier.",
+  },
+  {
+    name: "Signal Comparison",
+    type: "comparison",
+    target: 6,
+    time: 35,
+    objective: "Compare left vs right values",
+    tip: "Use quick comparison buttons to transmit answers fast.",
+  },
+  {
+    name: "Sequence Hack",
+    type: "sequence",
+    target: 6,
+    time: 40,
+    objective: "Crack numerical sequences",
+    tip: "Look for consistent deltas or multipliers.",
+  },
+  {
+    name: "Logic Circuit",
+    type: "logic",
+    target: 7,
+    time: 45,
+    objective: "Identify anomalies in logic streams",
+    tip: "Find the number that breaks the pattern.",
+  },
+  {
+    name: "Inequality Firewall",
+    type: "inequality",
+    target: 7,
+    time: 50,
+    objective: "Solve inequality thresholds",
+    tip: "Enter the smallest integer that satisfies the inequality.",
+  },
+  {
+    name: "Final Fusion",
+    type: "mixed",
+    target: 8,
+    time: 55,
+    objective: "Mixed protocol: all challenge types",
+    tip: "Stay calm. Events activate more often here.",
+  },
+];
 
-// Utility to ensure UI never breaks on invalid values
-function safeValue(value, fallback) {
-  return Number.isFinite(value) ? value : fallback;
-}
+const state = {
+  missionIndex: 0,
+  score: 0,
+  displayScore: 0,
+  streak: 0,
+  multiplier: 1,
+  solved: 0,
+  timeLeft: 0,
+  timerId: null,
+  currentAnswer: null,
+  currentType: "equation",
+  soundEnabled: true,
+  difficulty: "easy",
+  event: null,
+  eventTimer: null,
+  speedRate: 1,
+  powerups: { time: 1, double: 1, skip: 1 },
+  doubleActive: false,
+  doubleTimer: null,
+};
 
-// UI updates for score/time/level/streak
-function updatePanel() {
-  scoreEl.textContent = safeValue(score, 0);
-  levelEl.textContent = safeValue(level, 1);
-  timeEl.textContent = safeValue(timeLeft, TOTAL_TIME);
-  streakEl.textContent = safeValue(streak, 0);
-}
+const difficultyScale = {
+  easy: 1,
+  medium: 1.35,
+  hard: 1.7,
+};
 
-// Score animation for correct answers
-function animateScore() {
-  scoreEl.classList.add("pop");
-  setTimeout(() => scoreEl.classList.remove("pop"), 180);
-}
-
-// Smooth question transition
-function setQuestionText(text) {
-  questionEl.classList.add("fade-out");
-  setTimeout(() => {
-    questionEl.textContent = text;
-    questionEl.classList.remove("fade-out");
-  }, 160);
-}
-
-// Flash feedback for correct/incorrect answers
-function flashScreen(type) {
-  flashEl.classList.remove("success", "error");
-  void flashEl.offsetWidth;
-  flashEl.classList.add(type);
-  setTimeout(() => {
-    flashEl.classList.remove(type);
-  }, 150);
-}
-
-// Neon level-up popup
-function showLevelUp() {
-  levelUpEl.classList.add("show");
-  setTimeout(() => levelUpEl.classList.remove("show"), 900);
-}
-
-// Circular countdown animation
-function updateRing() {
-  const ratio = Math.max(0, timeLeft) / TOTAL_TIME;
-  const offset = RING_CIRCUMFERENCE * (1 - ratio);
-  ringProgress.style.strokeDashoffset = `${offset}`;
-
-  if (timeLeft <= 10) {
-    timerRing.classList.add("danger");
-  } else {
-    timerRing.classList.remove("danger");
-  }
-}
-
-// Sound playback with safety guards
-function playSound(name) {
-  if (!soundEnabled || !sounds[name]) return;
-  try {
-    const sound = sounds[name];
-    sound.currentTime = 0;
-    sound.play();
-  } catch (error) {
-    console.error("Sound error:", error);
-  }
-}
-
-// Load lightweight embedded sounds (no external assets)
-function loadSounds() {
-  try {
-    const tone = "data:audio/wav;base64,UklGRjQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQwAAAAA/////wAAAP///wAAAAA=";
-    sounds.correct = new Audio(tone);
-    sounds.wrong = new Audio(tone);
-    sounds.level = new Audio(tone);
-    sounds.start = new Audio(tone);
-    sounds.beep = new Audio(tone);
-  } catch (error) {
-    console.error("Failed to load sounds:", error);
-  }
-}
-
+// ------------------------
+// Utility helpers
+// ------------------------
 function randomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function getDifficultyLimit() {
-  const checked = document.querySelector("input[name='difficulty']:checked");
-  const key = checked ? checked.value : "easy";
-  return difficultyRanges[key] || difficultyRanges.easy;
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
 }
 
-// Simple logic sequence generator
-function generateLogicPuzzle(limit) {
-  const start = randomInt(1, Math.max(3, Math.floor(limit / 4)));
-  const step = randomInt(2, 6);
-  const seq = [start, start + step, start + step * 2];
-  const answer = start + step * 3;
+function animateNumber(el, from, to) {
+  const start = performance.now();
+  const duration = 400;
+  function tick(now) {
+    const progress = clamp((now - start) / duration, 0, 1);
+    const value = Math.round(from + (to - from) * progress);
+    el.textContent = value;
+    if (progress < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+function showScreen(screen) {
+  [ui.intro, ui.game, ui.missionComplete].forEach((section) => {
+    section.classList.remove("active");
+  });
+  screen.classList.add("active");
+}
+
+function flash(type) {
+  ui.flash.classList.remove("success", "fail");
+  void ui.flash.offsetWidth;
+  ui.flash.classList.add(type);
+}
+
+function shake() {
+  ui.app.classList.remove("shake");
+  void ui.app.offsetWidth;
+  ui.app.classList.add("shake");
+}
+
+// ------------------------
+// Audio (minimal, local)
+// ------------------------
+let audioCtx = null;
+
+function playTone(freq, duration = 0.08) {
+  if (!state.soundEnabled) return;
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = "sine";
+  osc.frequency.value = freq;
+  gain.gain.value = 0.05;
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + duration);
+}
+
+// ------------------------
+// Mission + UI setup
+// ------------------------
+function setDifficulty(value) {
+  state.difficulty = value;
+  ui.difficultyButtons.forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.difficulty === value);
+  });
+}
+
+function updatePowerupUI() {
+  ui.powerTimeCount.textContent = `x${state.powerups.time}`;
+  ui.powerDoubleCount.textContent = `x${state.powerups.double}`;
+  ui.powerSkipCount.textContent = `x${state.powerups.skip}`;
+  ui.powerTime.disabled = state.powerups.time <= 0;
+  ui.powerDouble.disabled = state.powerups.double <= 0;
+  ui.powerSkip.disabled = state.powerups.skip <= 0;
+}
+
+function setEventBanner(text, accent = "") {
+  ui.eventBanner.textContent = text;
+  ui.eventBanner.style.color = accent || "";
+}
+
+function updateHUD() {
+  ui.hudTime.textContent = Math.max(0, Math.ceil(state.timeLeft));
+  animateNumber(ui.hudScore, state.displayScore, state.score);
+  state.displayScore = state.score;
+  ui.hudStreak.textContent = state.streak;
+}
+
+function updateProgress() {
+  const mission = missions[state.missionIndex];
+  const ratio = clamp(state.solved / mission.target, 0, 1);
+  ui.missionProgress.style.width = `${ratio * 100}%`;
+  ui.progressText.textContent = `${state.solved} / ${mission.target} solved`;
+}
+
+function updateMissionInfo() {
+  const mission = missions[state.missionIndex];
+  ui.hudMission.textContent = mission.name;
+  ui.hudObjective.textContent = mission.objective;
+  ui.missionTip.textContent = mission.tip;
+  ui.missionList.innerHTML = `
+    <li>${mission.objective}</li>
+    <li>Maintain streaks to boost multipliers.</li>
+    <li>Use power-ups when pressure spikes.</li>
+  `;
+}
+
+// ------------------------
+// Question generators
+// ------------------------
+function generateEquation() {
+  const scale = difficultyScale[state.difficulty];
+  const a = randomInt(1, Math.floor(4 * scale));
+  const x = randomInt(2, Math.floor(9 * scale));
+  const b = randomInt(-8, 12);
+  const c = a * x + b;
   return {
-    question: `${seq[0]}، ${seq[1]}، ${seq[2]}، ؟`,
+    text: `Solve for x: ${a}x ${b >= 0 ? "+" : "-"} ${Math.abs(b)} = ${c}`,
+    answer: x,
+  };
+}
+
+function generateSequence() {
+  const scale = difficultyScale[state.difficulty];
+  const start = randomInt(2, Math.floor(6 * scale));
+  const step = randomInt(2, Math.floor(5 * scale));
+  const increment = randomInt(1, 3);
+  const seq = [
+    start,
+    start + step,
+    start + step + (step + increment),
+    start + step + (step + increment) + (step + increment * 2),
+  ];
+  const answer = seq[3] + (step + increment * 3);
+  return {
+    text: `Sequence breach: ${seq[0]}, ${seq[1]}, ${seq[2]}, ${seq[3]}, ?`,
     answer,
   };
 }
 
-// Random question generator including new types
-function generateQuestion() {
-  const maxNumber = getDifficultyLimit() + (level - 1) * 6;
-  const operator = operators[randomInt(0, operators.length - 1)];
-
-  let left = randomInt(1, maxNumber);
-  let right = randomInt(1, maxNumber);
-  let questionText = "";
+function generateComparison() {
+  const scale = difficultyScale[state.difficulty];
+  const left = randomInt(10, Math.floor(40 * scale));
+  const right = randomInt(10, Math.floor(40 * scale));
+  const leftDelta = randomInt(3, 9);
+  const rightDelta = randomInt(2, 8);
+  const leftExpr = `${left} + ${leftDelta}`;
+  const rightExpr = `${right} - ${rightDelta}`;
+  const leftValue = left + leftDelta;
+  const rightValue = right - rightDelta;
   let answer = 0;
-
-  if (operator === "+") {
-    answer = left + right;
-    questionText = `${left} + ${right} = ؟`;
-  } else if (operator === "-") {
-    if (right > left) {
-      [left, right] = [right, left];
-    }
-    answer = left - right;
-    questionText = `${left} - ${right} = ؟`;
-  } else if (operator === "*") {
-    answer = left * right;
-    questionText = `${left} × ${right} = ؟`;
-  } else if (operator === "/") {
-    right = randomInt(1, Math.max(2, Math.floor(maxNumber / 4)));
-    answer = randomInt(1, Math.max(2, Math.floor(maxNumber / 5)));
-    left = right * answer;
-    questionText = `${left} ÷ ${right} = ؟`;
-  } else if (operator === "^") {
-    left = randomInt(2, 5);
-    right = randomInt(2, 3);
-    answer = left ** right;
-    questionText = `${left} ^ ${right} = ؟`;
-  }
-
-  if (Math.random() < 0.2) {
-    const puzzle = generateLogicPuzzle(maxNumber);
-    questionText = puzzle.question;
-    answer = puzzle.answer;
-  }
-
-  correctAnswer = answer;
-  setQuestionText(questionText);
+  if (leftValue > rightValue) answer = 1;
+  if (leftValue < rightValue) answer = 2;
+  return {
+    text: `Compare: (${leftExpr}) vs (${rightExpr}). Enter 1 for left, 2 for right, 0 for equal.`,
+    answer,
+    useChoices: true,
+  };
 }
 
-// Combo bonuses for streaks
-function applyComboBonus() {
-  let bonus = 0;
-  if (streak === 3) {
-    bonus = 5;
-  } else if (streak === 5) {
-    bonus = 15;
-  }
+function generateLogic() {
+  const base = randomInt(4, 10);
+  const step = randomInt(3, 6);
+  const sequence = [base, base + step, base + step * 2, base + step * 3];
+  const outlier = base + step * randomInt(4, 6) + randomInt(2, 6);
+  const slot = randomInt(1, 4);
+  const items = [...sequence];
+  items.splice(slot, 0, outlier);
+  return {
+    text: `Logic anomaly detected: ${items.join(", ")}. Enter the anomaly.`,
+    answer: outlier,
+  };
+}
 
-  if (bonus > 0) {
-    score += bonus;
-    feedbackEl.textContent = `سلسلة رائعة! +${bonus} نقاط إضافية`;
-    animateScore();
+function generateInequality() {
+  const scale = difficultyScale[state.difficulty];
+  const a = randomInt(2, Math.floor(6 * scale));
+  const b = randomInt(-8, 12);
+  const x = randomInt(3, Math.floor(9 * scale));
+  const comparator = ">=";
+  const c = a * x + b;
+  const answer = Math.ceil((c - b) / a);
+  return {
+    text: `Inequality firewall: ${a}x ${b >= 0 ? "+" : "-"} ${Math.abs(b)} ${comparator} ${c}. Smallest integer x?`,
+    answer,
+  };
+}
+
+function generateArithmetic() {
+  const scale = difficultyScale[state.difficulty];
+  const ops = ["+", "-", "×", "÷"];
+  const op = ops[randomInt(0, ops.length - 1)];
+  let left = randomInt(6, Math.floor(20 * scale));
+  let right = randomInt(2, Math.floor(12 * scale));
+  let answer;
+  if (op === "+") answer = left + right;
+  if (op === "-") answer = left - right;
+  if (op === "×") answer = left * right;
+  if (op === "÷") {
+    answer = randomInt(2, Math.floor(10 * scale));
+    right = randomInt(2, Math.floor(8 * scale));
+    left = answer * right;
   }
+  return {
+    text: `Quick solve: ${left} ${op} ${right} = ?`,
+    answer,
+  };
+}
+
+function generateMixed() {
+  const types = ["equation", "sequence", "comparison", "logic", "inequality", "arithmetic"];
+  const type = types[randomInt(0, types.length - 1)];
+  return generateByType(type);
+}
+
+function generateByType(type) {
+  switch (type) {
+    case "equation":
+      return generateEquation();
+    case "sequence":
+      return generateSequence();
+    case "comparison":
+      return generateComparison();
+    case "logic":
+      return generateLogic();
+    case "inequality":
+      return generateInequality();
+    case "arithmetic":
+      return generateArithmetic();
+    case "mixed":
+      return generateMixed();
+    default:
+      return generateEquation();
+  }
+}
+
+function setQuestion() {
+  const mission = missions[state.missionIndex];
+  const type = mission.type === "mixed" ? "mixed" : mission.type;
+  const question = generateByType(type);
+  state.currentAnswer = question.answer;
+  state.currentType = type;
+  ui.questionText.textContent = question.text;
+  if (question.useChoices) {
+    ui.choiceRow.setAttribute("aria-hidden", "false");
+  } else {
+    ui.choiceRow.setAttribute("aria-hidden", "true");
+  }
+  ui.answerInput.value = "";
+  ui.answerInput.focus();
+}
+
+// ------------------------
+// Game flow
+// ------------------------
+function resetMissionState() {
+  const mission = missions[state.missionIndex];
+  state.solved = 0;
+  state.streak = 0;
+  state.multiplier = 1;
+  state.timeLeft = mission.time;
+  state.speedRate = 1;
+  state.powerups = { time: 1, double: 1, skip: 1 };
+  state.doubleActive = false;
+  clearInterval(state.timerId);
+  clearTimeout(state.eventTimer);
+  clearTimeout(state.doubleTimer);
+  state.timerId = null;
+  state.event = null;
+  setEventBanner("System Ready");
+  updatePowerupUI();
+  updateProgress();
+  updateHUD();
+  setQuestion();
+}
+
+function startMission() {
+  updateMissionInfo();
+  resetMissionState();
+  showScreen(ui.game);
+  startTimer();
+  playTone(520);
 }
 
 function startTimer() {
-  if (timerId) {
-    clearInterval(timerId);
-  }
-
-  timerId = setInterval(() => {
-    timeLeft -= 1;
-    updatePanel();
-    updateRing();
-
-    if (timeLeft === 10) {
-      playSound("beep");
+  clearInterval(state.timerId);
+  state.timerId = setInterval(() => {
+    state.timeLeft -= state.speedRate;
+    if (state.timeLeft <= 0) {
+      state.timeLeft = 0;
+      endMission(false);
     }
-
-    if (timeLeft <= 0) {
-      endGame();
-    }
+    updateHUD();
   }, 1000);
 }
 
-function startGame() {
-  score = 0;
-  level = 1;
-  timeLeft = TOTAL_TIME;
-  streak = 0;
-  isRunning = true;
+function applyAnswer(isCorrect) {
+  if (isCorrect) {
+    state.solved += 1;
+    state.streak += 1;
+    state.multiplier = clamp(1 + Math.floor(state.streak / 3) * 0.5, 1, 3);
 
-  feedbackEl.textContent = "انطلق!";
-  answerInput.value = "";
-  answerInput.disabled = false;
-  checkBtn.disabled = false;
-  answerInput.focus();
+    const base = 10 + state.solved * 2;
+    const double = state.doubleActive ? 1.5 : 1;
+    const delta = Math.round(base * state.multiplier * double);
+    state.score += delta;
 
-  updatePanel();
-  updateRing();
-  generateQuestion();
-  startTimer();
-  playSound("start");
-}
+    ui.questionCard.classList.add("success");
+    setTimeout(() => ui.questionCard.classList.remove("success"), 300);
+    flash("success");
+    playTone(680);
 
-function endGame() {
-  isRunning = false;
-  clearInterval(timerId);
-  timerId = null;
-  timeLeft = 0;
-  updatePanel();
-  updateRing();
-  feedbackEl.textContent = `انتهى الوقت! نتيجتك النهائية: ${score}`;
-  answerInput.disabled = true;
-  checkBtn.disabled = true;
-}
+    updateProgress();
+    updateHUD();
 
-function handleCorrectAnswer() {
-  score += 10;
-  streak += 1;
+    if (state.solved >= missions[state.missionIndex].target) {
+      endMission(true);
+      return;
+    }
 
-  if (score % 50 === 0) {
-    level += 1;
-    showLevelUp();
-    playSound("level");
-  }
-
-  applyComboBonus();
-  feedbackEl.textContent = "إجابة صحيحة!";
-  animateScore();
-  flashScreen("success");
-  answerInput.value = "";
-  generateQuestion();
-  updatePanel();
-  playSound("correct");
-}
-
-function handleWrongAnswer() {
-  streak = 0;
-  feedbackEl.textContent = "إجابة خاطئة، حاول مرة أخرى.";
-  flashScreen("error");
-  updatePanel();
-  playSound("wrong");
-}
-
-function checkAnswer() {
-  if (!isRunning) {
-    feedbackEl.textContent = "اضغط ابدأ اللعبة أولاً.";
-    return;
-  }
-
-  const userAnswer = parseInt(answerInput.value, 10);
-  if (Number.isNaN(userAnswer)) {
-    feedbackEl.textContent = "أدخل رقمًا صالحًا.";
-    return;
-  }
-
-  if (userAnswer === correctAnswer) {
-    handleCorrectAnswer();
+    maybeTriggerEvent();
+    setQuestion();
   } else {
-    handleWrongAnswer();
+    state.streak = 0;
+    state.multiplier = 1;
+    state.timeLeft = Math.max(0, state.timeLeft - 3);
+    ui.questionCard.classList.add("fail");
+    setTimeout(() => ui.questionCard.classList.remove("fail"), 300);
+    flash("fail");
+    shake();
+    playTone(220);
+    updateHUD();
   }
 }
 
-function toggleSound() {
-  soundEnabled = !soundEnabled;
-  soundBtn.textContent = soundEnabled ? "تشغيل" : "إيقاف";
-  soundBtn.setAttribute("aria-pressed", String(soundEnabled));
+function parseAnswer() {
+  const value = ui.answerInput.value.trim();
+  if (value === "") return null;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
 }
 
-function init() {
-  loadSounds();
-  updatePanel();
-  updateRing();
+function submitAnswer() {
+  const answer = parseAnswer();
+  if (answer === null) return;
+  const isCorrect = Number(answer) === Number(state.currentAnswer);
+  applyAnswer(isCorrect);
 }
 
-checkBtn.addEventListener("click", checkAnswer);
-startBtn.addEventListener("click", startGame);
-answerInput.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") {
-    checkAnswer();
+// ------------------------
+// Events + Power-ups
+// ------------------------
+function maybeTriggerEvent() {
+  if (state.event || missions[state.missionIndex].type === "equation") return;
+  const roll = Math.random();
+  if (roll > 0.18) return;
+
+  const eventType = Math.random() > 0.5 ? "bonus" : "speed";
+  state.event = eventType;
+
+  if (eventType === "bonus") {
+    setEventBanner("Bonus Round: +50% score", "var(--success)");
+    state.doubleActive = true;
+    clearTimeout(state.eventTimer);
+    state.eventTimer = setTimeout(() => {
+      state.doubleActive = false;
+      state.event = null;
+      setEventBanner("System Ready");
+    }, 12000);
+  } else {
+    setEventBanner("Speed Round: timer accelerated", "var(--warning)");
+    state.speedRate = 1.5;
+    clearTimeout(state.eventTimer);
+    state.eventTimer = setTimeout(() => {
+      state.speedRate = 1;
+      state.event = null;
+      setEventBanner("System Ready");
+    }, 12000);
   }
+}
+
+function usePowerup(type) {
+  if (state.powerups[type] <= 0) return;
+  state.powerups[type] -= 1;
+  updatePowerupUI();
+
+  if (type === "time") {
+    state.timeLeft += 10;
+    playTone(740);
+    updateHUD();
+    return;
+  }
+
+  if (type === "double") {
+    state.doubleActive = true;
+    setEventBanner("Double Score Active", "var(--success)");
+    playTone(620);
+    clearTimeout(state.doubleTimer);
+    state.doubleTimer = setTimeout(() => {
+      state.doubleActive = false;
+      if (!state.event) setEventBanner("System Ready");
+    }, 15000);
+    return;
+  }
+
+  if (type === "skip") {
+    state.streak = 0;
+    state.multiplier = 1;
+    state.solved += 1;
+    updateProgress();
+    updateHUD();
+    playTone(460);
+    if (state.solved >= missions[state.missionIndex].target) {
+      endMission(true);
+    } else {
+      setQuestion();
+    }
+  }
+}
+
+// ------------------------
+// Mission completion
+// ------------------------
+function endMission(success) {
+  clearInterval(state.timerId);
+  clearTimeout(state.eventTimer);
+  clearTimeout(state.doubleTimer);
+  state.timerId = null;
+  state.event = null;
+
+  const mission = missions[state.missionIndex];
+  if (success) {
+    ui.missionSummary.textContent = `Mission ${mission.name} cleared with ${state.score} total score.`;
+    playTone(860, 0.12);
+    ui.nextMission.textContent = state.missionIndex < missions.length - 1 ? "Deploy Next Mission" : "Restart Protocol";
+  } else {
+    ui.missionSummary.textContent = `Mission failed. You solved ${state.solved} of ${mission.target}. Try again.`;
+    ui.nextMission.textContent = "Retry Mission";
+  }
+
+  ui.missionComplete.setAttribute("aria-hidden", "false");
+  showScreen(ui.missionComplete);
+}
+
+function proceedMission() {
+  const mission = missions[state.missionIndex];
+  if (state.solved >= mission.target) {
+    state.missionIndex = state.missionIndex < missions.length - 1 ? state.missionIndex + 1 : 0;
+  }
+  ui.missionComplete.setAttribute("aria-hidden", "true");
+  startMission();
+}
+
+// ------------------------
+// Event listeners
+// ------------------------
+ui.startMissionBtn.addEventListener("click", () => {
+  startMission();
 });
-soundBtn.addEventListener("click", toggleSound);
 
-init();
+ui.submitAnswer.addEventListener("click", submitAnswer);
+ui.answerInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") submitAnswer();
+});
+
+ui.choiceButtons.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    ui.answerInput.value = btn.dataset.choice;
+    submitAnswer();
+  });
+});
+
+ui.soundToggle.addEventListener("click", () => {
+  state.soundEnabled = !state.soundEnabled;
+  ui.soundToggle.setAttribute("aria-pressed", String(state.soundEnabled));
+});
+
+ui.themeToggle.addEventListener("click", () => {
+  const body = document.body;
+  const magenta = body.classList.toggle("theme-magenta");
+  ui.themeToggle.setAttribute("aria-pressed", String(magenta));
+});
+
+ui.difficultyButtons.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    setDifficulty(btn.dataset.difficulty);
+    setQuestion();
+  });
+});
+
+ui.powerTime.addEventListener("click", () => usePowerup("time"));
+ui.powerDouble.addEventListener("click", () => usePowerup("double"));
+ui.powerSkip.addEventListener("click", () => usePowerup("skip"));
+
+ui.nextMission.addEventListener("click", proceedMission);
+
+// ------------------------
+// Initial safe state
+// ------------------------
+setDifficulty("easy");
+updateMissionInfo();
+updatePowerupUI();
+updateProgress();
+updateHUD();
+showScreen(ui.intro);
+ui.questionText.textContent = "Initialize to receive mission data.";

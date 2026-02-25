@@ -1,115 +1,158 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>لعبة ذكاء الرياضيات</title>
+    <title>Math Intelligence Game: Neon Protocol</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;600;700&family=Space+Grotesk:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/style.css" />
   </head>
-  <body>
-    <main class="page">
-      <section class="game-card" aria-live="polite">
-        <div class="glow-border" aria-hidden="true"></div>
+  <body class="theme-cyan">
+    <div class="backdrop" aria-hidden="true">
+      <div class="grid"></div>
+      <div class="waves"></div>
+      <div class="particles"></div>
+      <div class="scanlines"></div>
+    </div>
 
-        <header class="game-header">
-          <h1 class="title">لعبة ذكاء الرياضيات</h1>
-          <p class="subtitle">اختبر سرعتك ودقتك مع تحديات رياضية تتصاعد كلما تقدمت.</p>
+    <main id="app" class="app" aria-live="polite">
+      <section id="intro" class="screen intro active">
+        <div class="intro-panel">
+          <div class="intro-badge">Neon Protocol v2.4</div>
+          <h1 class="intro-title">Math Intelligence Game</h1>
+          <p class="intro-subtitle">
+            Jack into the grid. Complete missions, hack the sequences, and prove your logic under pressure.
+          </p>
+          <div class="intro-matrix">
+            <div class="matrix-line"></div>
+            <div class="matrix-line"></div>
+            <div class="matrix-line"></div>
+          </div>
+          <button id="startMissionBtn" class="btn primary large">Initialize Mission</button>
+          <p class="intro-note">Tip: Power-ups are limited per mission. Use them wisely.</p>
+        </div>
+      </section>
+
+      <section id="game" class="screen game">
+        <header class="hud">
+          <div class="hud-group">
+            <div class="hud-label">Mission</div>
+            <div id="hudMission" class="hud-value">Boot Sequence</div>
+            <div id="hudObjective" class="hud-sub">Solve 5 equations in 30s</div>
+          </div>
+          <div class="hud-group center">
+            <div class="hud-stat">
+              <span class="hud-label">Score</span>
+              <span id="hudScore" class="hud-value">0</span>
+            </div>
+            <div class="hud-stat">
+              <span class="hud-label">Time</span>
+              <span id="hudTime" class="hud-value">30</span>
+            </div>
+            <div class="hud-stat">
+              <span class="hud-label">Streak</span>
+              <span id="hudStreak" class="hud-value">0</span>
+            </div>
+          </div>
+          <div class="hud-group right">
+            <button id="soundToggle" class="toggle" aria-pressed="true">
+              <span>Sound</span>
+              <span class="toggle-indicator"></span>
+            </button>
+            <div class="segmented" role="group" aria-label="Difficulty">
+              <button class="segment active" data-difficulty="easy">Easy</button>
+              <button class="segment" data-difficulty="medium">Medium</button>
+              <button class="segment" data-difficulty="hard">Hard</button>
+            </div>
+            <button id="themeToggle" class="toggle" aria-pressed="false">
+              <span>Theme</span>
+              <span class="toggle-indicator"></span>
+            </button>
+          </div>
         </header>
 
-        <div class="top-row">
-          <div class="timer-ring" aria-label="المؤقت">
-            <svg viewBox="0 0 120 120" class="ring">
-              <circle class="ring-bg" cx="60" cy="60" r="52"></circle>
-              <circle
-                class="ring-progress"
-                cx="60"
-                cy="60"
-                r="52"
-                stroke-dasharray="326"
-                stroke-dashoffset="0"
-              ></circle>
-            </svg>
-            <div class="ring-value">
-              <span id="time">60</span>
-              <span class="ring-label">ثانية</span>
+        <section class="game-layout">
+          <div class="main-panel">
+            <div class="panel-head">
+              <div class="panel-title">Neural Challenge</div>
+              <div id="eventBanner" class="event-banner">System Ready</div>
+            </div>
+
+            <div id="questionCard" class="question-card">
+              <div class="question-label">Encrypted Prompt</div>
+              <div id="questionText" class="question-text">Initialize to receive mission data.</div>
+              <div id="choiceRow" class="choice-row" aria-hidden="true">
+                <button class="chip" data-choice="1">Left > Right</button>
+                <button class="chip" data-choice="0">Equal</button>
+                <button class="chip" data-choice="2">Right > Left</button>
+              </div>
+            </div>
+
+            <div class="input-row">
+              <input id="answerInput" type="text" placeholder="Enter response" autocomplete="off" />
+              <button id="submitAnswer" class="btn primary">Transmit</button>
+            </div>
+
+            <div class="progress-row">
+              <div class="progress-label">Mission Progress</div>
+              <div class="progress-track">
+                <div id="missionProgress" class="progress-fill"></div>
+              </div>
+              <div id="progressText" class="progress-text">0 / 5 solved</div>
             </div>
           </div>
 
-          <div class="status-panel">
-            <div class="status-item">
-              <span class="label">النقاط</span>
-              <span id="score" class="value">0</span>
+          <aside class="side-panel">
+            <div class="side-section">
+              <div class="side-title">Objectives</div>
+              <ul id="missionList" class="side-list">
+                <li>Complete the mission target.</li>
+                <li>Maintain a streak for multipliers.</li>
+                <li>Use power-ups strategically.</li>
+              </ul>
             </div>
-            <div class="status-item">
-              <span class="label">المستوى</span>
-              <span id="level" class="value">1</span>
-            </div>
-            <div class="status-item">
-              <span class="label">السلسلة</span>
-              <span id="streak" class="value">0</span>
-            </div>
-          </div>
-        </div>
 
-        <section class="question-area">
-          <div id="question" class="question">اضغط ابدأ اللعبة لتوليد السؤال</div>
+            <div class="side-section">
+              <div class="side-title">Power-Ups</div>
+              <div class="power-grid">
+                <button id="powerTime" class="power" data-power="time">
+                  +10s
+                  <span class="power-meta" id="powerTimeCount">x1</span>
+                </button>
+                <button id="powerDouble" class="power" data-power="double">
+                  Double Score
+                  <span class="power-meta" id="powerDoubleCount">x1</span>
+                </button>
+                <button id="powerSkip" class="power" data-power="skip">
+                  Skip
+                  <span class="power-meta" id="powerSkipCount">x1</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="side-section">
+              <div class="side-title">Mission Intel</div>
+              <p id="missionTip" class="side-text">Complete all objectives before the timer hits zero.</p>
+            </div>
+          </aside>
         </section>
+      </section>
 
-        <div class="controls">
-          <div class="difficulty">
-            <span class="label">الصعوبة</span>
-            <div class="difficulty-options">
-              <label class="chip">
-                <input type="radio" name="difficulty" value="easy" checked />
-                <span>سهلة</span>
-              </label>
-              <label class="chip">
-                <input type="radio" name="difficulty" value="medium" />
-                <span>متوسطة</span>
-              </label>
-              <label class="chip">
-                <input type="radio" name="difficulty" value="hard" />
-                <span>صعبة</span>
-              </label>
-            </div>
-          </div>
-
-          <div class="sound-toggle">
-            <span class="label">الصوت</span>
-            <button id="soundBtn" class="btn tiny" aria-pressed="false">إيقاف</button>
-          </div>
+      <section id="missionComplete" class="screen modal" aria-hidden="true">
+        <div class="modal-card">
+          <div class="modal-title">Mission Complete</div>
+          <p id="missionSummary" class="modal-text"></p>
+          <button id="nextMission" class="btn primary">Deploy Next Mission</button>
         </div>
-
-        <div class="input-row">
-          <input
-            id="answer"
-            type="number"
-            inputmode="numeric"
-            placeholder="اكتب إجابتك هنا"
-            autocomplete="off"
-            aria-label="إجابة السؤال"
-          />
-          <button id="checkBtn" class="btn primary">تحقق</button>
-        </div>
-
-        <div class="actions">
-          <button id="startBtn" class="btn ghost">ابدأ اللعبة</button>
-        </div>
-
-        <div id="feedback" class="feedback">جاهز للتحدي؟</div>
-
-        <footer class="footer">Developed by YOUCEF</footer>
       </section>
     </main>
 
     <div id="flash" class="flash" aria-hidden="true"></div>
-    <div id="levelUp" class="level-up" aria-hidden="true">Level Up!</div>
 
     <script src="/script.js"></script>
   </body>
