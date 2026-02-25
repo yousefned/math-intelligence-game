@@ -1,867 +1,950 @@
-const $ = (sel) => document.querySelector(sel);
-const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+(() => {
+  'use strict';
 
-const STORAGE_KEY = "neonRiftState";
-
-const defaultState = {
-  profile: {
-    xp: 0,
-    level: 1,
-    missionsCompleted: 0,
-    achievements: [],
-    powerups: {
-      time: 2,
-      double: 2,
-      skip: 2,
-      freeze: 2,
+  const el = {
+    btnHome: document.getElementById('btn-home'),
+    btnMissions: document.getElementById('btn-missions'),
+    btnStart: document.getElementById('btn-start'),
+    btnMissionSelect: document.getElementById('btn-mission-select'),
+    btnClaimReward: document.getElementById('btn-claim-reward'),
+    btnSubmit: document.getElementById('btn-submit'),
+    btnRisk: document.getElementById('btn-risk'),
+    btnNext: document.getElementById('btn-next'),
+    btnReplay: document.getElementById('btn-replay'),
+    btnHomeResult: document.getElementById('btn-home-result'),
+    missionGrid: document.getElementById('mission-grid'),
+    screens: {
+      home: document.getElementById('screen-home'),
+      missions: document.getElementById('screen-missions'),
+      game: document.getElementById('screen-game'),
+      result: document.getElementById('screen-result')
+    },
+    stats: {
+      level: document.getElementById('stat-level'),
+      xp: document.getElementById('stat-xp'),
+      achievements: document.getElementById('stat-achievements'),
+      streak: document.getElementById('stat-streak')
     },
     daily: {
-      lastClaim: null,
-      streak: 0,
+      status: document.getElementById('daily-status'),
+      item: document.getElementById('daily-reward-item')
     },
-  },
-  bestScores: {},
-  settings: {
-    sound: true,
-  },
-  missionUnlock: 1,
-};
+    hud: {
+      mission: document.getElementById('hud-mission'),
+      objective: document.getElementById('hud-objective'),
+      xp: document.getElementById('hud-xp'),
+      score: document.getElementById('hud-score'),
+      time: document.getElementById('hud-time'),
+      streak: document.getElementById('hud-streak'),
+      combo: document.getElementById('hud-combo'),
+      level: document.getElementById('hud-level'),
+      event: document.getElementById('hud-event')
+    },
+    questionType: document.getElementById('question-type'),
+    question: document.getElementById('question'),
+    choices: document.getElementById('choices'),
+    inputWrap: document.getElementById('input-wrap'),
+    answerInput: document.getElementById('answer-input'),
+    feedback: document.getElementById('feedback'),
+    objectiveList: document.getElementById('objective-list'),
+    powerups: document.getElementById('powerups'),
+    achievementFeed: document.getElementById('achievement-feed'),
+    progressBar: document.getElementById('progress-bar'),
+    status: document.getElementById('status'),
+    result: {
+      title: document.getElementById('result-title'),
+      xp: document.getElementById('result-xp'),
+      accuracy: document.getElementById('result-accuracy'),
+      streak: document.getElementById('result-streak'),
+      combo: document.getElementById('result-combo'),
+      rewards: document.getElementById('result-rewards')
+    },
+    riftOverlay: document.getElementById('rift-overlay'),
+    flash: document.getElementById('flash'),
+    achievementPopup: document.getElementById('achievement-popup')
+  };
 
-const state = loadState();
-const missions = buildMissions();
-
-const run = {
-  active: false,
-  mission: null,
-  timeLeft: 0,
-  timerId: null,
-  lastTick: 0,
-  score: 0,
-  streak: 0,
-  combo: 1,
-  comboPeak: 1,
-  xpGained: 0,
-  questions: 0,
-  correct: 0,
-  memory: [],
-  event: null,
-  eventEnds: 0,
-  riskArmed: false,
-  achievementsUnlocked: [],
-  eventsTriggered: 0,
-  freezeUntil: 0,
-};
-
-const elements = {
-  screens: {
-    home: $("#home"),
-    missions: $("#missions"),
-    game: $("#game"),
-    results: $("#results"),
-  },
-  soundToggle: $("#soundToggle"),
-  soundState: $("#soundState"),
-  resetProgress: $("#resetProgress"),
-  startRun: $("#startRun"),
-  openMissions: $("#openMissions"),
-  backHome: $("#backHome"),
-  missionGrid: $("#missionGrid"),
-  homeLevel: $("#homeLevel"),
-  homeXp: $("#homeXp"),
-  homeMissions: $("#homeMissions"),
-  homeAchievements: $("#homeAchievements"),
-  dailyText: $("#dailyText"),
-  dailyRewardPanel: $("#dailyRewardPanel"),
-  claimReward: $("#claimReward"),
-  homeMicro: $("#homeMicro"),
-  hudMission: $("#hudMission"),
-  hudObjective: $("#hudObjective"),
-  hudXp: $("#hudXp"),
-  hudScore: $("#hudScore"),
-  hudTime: $("#hudTime"),
-  hudStreak: $("#hudStreak"),
-  hudCombo: $("#hudCombo"),
-  hudLevel: $("#hudLevel"),
-  hudEvent: $("#hudEvent"),
-  missionType: $("#missionType"),
-  runStatus: $("#runStatus"),
-  objectiveList: $("#objectiveList"),
-  powerGrid: $("#powerGrid"),
-  runAchievements: $("#runAchievements"),
-  questionText: $("#questionText"),
-  questionSub: $("#questionSub"),
-  choiceRow: $("#choiceRow"),
-  inputRow: $("#inputRow"),
-  answerInput: $("#answerInput"),
-  submitAnswer: $("#submitAnswer"),
-  keypad: $("#keypad"),
-  progressFill: $("#progressFill"),
-  feedback: $("#feedback"),
-  resultsTitle: $("#resultsTitle"),
-  resultsSubtitle: $("#resultsSubtitle"),
-  resultsSummary: $("#resultsSummary"),
-  resultsRewards: $("#resultsRewards"),
-  resultsAchievements: $("#resultsAchievements"),
-  nextMission: $("#nextMission"),
-  replayMission: $("#replayMission"),
-  resultsHome: $("#resultsHome"),
-};
-
-const achievementList = [
-  { id: "first-blood", name: "First Blood", desc: "Solve your first prompt." },
-  { id: "hot-streak", name: "Hot Streak", desc: "Reach a streak of 5." },
-  { id: "combo-master", name: "Combo Master", desc: "Hit combo x4." },
-  { id: "boss-breaker", name: "Boss Breaker", desc: "Defeat a boss mission." },
-  { id: "flawless", name: "Flawless Flow", desc: "Finish with 100% accuracy." },
-  { id: "speed-demon", name: "Speed Demon", desc: "Finish with 50% time remaining." },
-  { id: "rift-tamer", name: "Rift Tamer", desc: "Trigger 3 rift events." },
-  { id: "risk-taker", name: "Risk Taker", desc: "Win a Risk Mode question." },
-];
-
-const powerupDefs = {
-  time: { label: "Extra Time", desc: "+10s" },
-  double: { label: "Double XP", desc: "15s boost" },
-  skip: { label: "Skip", desc: "Skip prompt" },
-  freeze: { label: "Freeze", desc: "Pause 5s" },
-};
-
-const eventDefs = [
-  { id: "overclock", name: "Overclock", desc: "Double XP" },
-  { id: "dilation", name: "Time Dilation", desc: "Timer slows" },
-  { id: "flux", name: "Flux Surge", desc: "Streak +1 bonus" },
-];
-
-const microcopy = [
-  "Neural oscillation stable.",
-  "Rift sensors online.",
-  "Cognitive lattice engaged.",
-  "Signal integrity: optimal.",
-  "Quantum relay synchronized.",
-];
-
-init();
-
-function init() {
-  buildKeypad();
-  bindEvents();
-  renderHome();
-  renderMissions();
-  setScreen("home");
-}
-
-function bindEvents() {
-  elements.startRun.addEventListener("click", () => startMission(missions[0]));
-  elements.openMissions.addEventListener("click", () => setScreen("missions"));
-  elements.backHome.addEventListener("click", () => setScreen("home"));
-  elements.resultsHome.addEventListener("click", () => setScreen("home"));
-  elements.nextMission.addEventListener("click", () => goNextMission());
-  elements.replayMission.addEventListener("click", () => replayMission());
-  elements.claimReward.addEventListener("click", claimDailyReward);
-  elements.soundToggle.addEventListener("click", toggleSound);
-  elements.resetProgress.addEventListener("click", resetProgress);
-  elements.submitAnswer.addEventListener("click", () => handleSubmit());
-  elements.answerInput.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      handleSubmit();
+  const Utils = {
+    randInt(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    },
+    pick(arr) {
+      return arr[Math.floor(Math.random() * arr.length)];
+    },
+    shuffle(arr) {
+      const clone = [...arr];
+      for (let i = clone.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [clone[i], clone[j]] = [clone[j], clone[i]];
+      }
+      return clone;
+    },
+    clamp(num, min, max) {
+      return Math.max(min, Math.min(max, num));
+    },
+    formatTime(sec) {
+      const s = Math.max(0, Math.round(sec));
+      const m = Math.floor(s / 60);
+      const r = s % 60;
+      return `${m}:${r.toString().padStart(2, '0')}`;
+    },
+    todayKey() {
+      const now = new Date();
+      return `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
     }
-  });
-}
+  };
 
-function resetProgress() {
-  Object.assign(state, structuredClone(defaultState));
-  saveState();
-  renderHome();
-  renderMissions();
-  setScreen("home");
-}
-
-function toggleSound() {
-  state.settings.sound = !state.settings.sound;
-  elements.soundToggle.setAttribute("aria-pressed", state.settings.sound);
-  elements.soundState.textContent = state.settings.sound ? "On" : "Off";
-  saveState();
-}
-
-function setScreen(name) {
-  Object.values(elements.screens).forEach((screen) => screen.classList.remove("active"));
-  elements.screens[name].classList.add("active");
-}
-
-function renderHome() {
-  state.profile.level = levelFromXp(state.profile.xp);
-  elements.homeLevel.textContent = state.profile.level;
-  elements.homeXp.textContent = state.profile.xp;
-  elements.homeMissions.textContent = state.profile.missionsCompleted;
-  elements.homeAchievements.textContent = state.profile.achievements.length;
-  elements.soundState.textContent = state.settings.sound ? "On" : "Off";
-  elements.soundToggle.setAttribute("aria-pressed", state.settings.sound);
-  elements.homeMicro.textContent = microcopy[Math.floor(Math.random() * microcopy.length)];
-  updateDailyRewardUI();
-}
-
-function renderMissions() {
-  elements.missionGrid.innerHTML = "";
-  missions.forEach((mission) => {
-    const card = document.createElement("div");
-    card.className = "mission-card" + (mission.isBoss ? " boss" : "");
-    const unlocked = mission.id <= state.missionUnlock;
-    if (!unlocked) card.classList.add("locked");
-    card.innerHTML = `
-      <div class="mission-tag">${mission.isBoss ? "Boss Mission" : mission.typeLabel}</div>
-      <div class="mission-title">Mission ${mission.id}</div>
-      <div class="mission-meta">${mission.title}</div>
-      <div class="mission-meta">Difficulty ${mission.difficulty}</div>
-      <div class="mission-meta">Best Score: ${state.bestScores[mission.id] || "--"}</div>
-    `;
-    card.addEventListener("click", () => {
-      if (!unlocked) return;
-      startMission(mission);
-    });
-    elements.missionGrid.appendChild(card);
-  });
-}
-
-function startMission(mission) {
-  cleanupRun();
-  run.active = true;
-  run.mission = mission;
-  run.timeLeft = mission.timeLimit;
-  run.lastTick = performance.now();
-  run.score = 0;
-  run.streak = 0;
-  run.combo = 1;
-  run.comboPeak = 1;
-  run.xpGained = 0;
-  run.questions = 0;
-  run.correct = 0;
-  run.memory = [];
-  run.event = null;
-  run.eventEnds = 0;
-  run.riskArmed = false;
-  run.achievementsUnlocked = [];
-  run.eventsTriggered = 0;
-  run.freezeUntil = 0;
-
-  renderRunUI();
-  setScreen("game");
-  nextQuestion();
-  run.timerId = setInterval(tick, 100);
-}
-
-function replayMission() {
-  if (run.mission) {
-    startMission(run.mission);
-  }
-}
-
-function goNextMission() {
-  const nextId = run.mission ? run.mission.id + 1 : 1;
-  const next = missions.find((m) => m.id === nextId) || missions[0];
-  startMission(next);
-}
-
-function renderRunUI() {
-  elements.hudMission.textContent = run.mission.id;
-  elements.hudObjective.textContent = run.mission.objective;
-  elements.hudLevel.textContent = state.profile.level;
-  elements.missionType.textContent = run.mission.typeLabel;
-  elements.runStatus.textContent = "Neural link active";
-  renderObjectives();
-  renderPowerups();
-  renderRunAchievements();
-  updateHud();
-}
-
-function renderObjectives() {
-  elements.objectiveList.innerHTML = "";
-  const list = [
-    `Solve ${run.mission.targetCount} prompts`,
-    `Accuracy ${run.mission.minAccuracy}%`,
-    `Time limit ${formatTime(run.mission.timeLimit)}`,
-  ];
-  if (run.mission.isBoss) list.push("Boss mechanics enabled");
-  list.forEach((item) => {
-    const li = document.createElement("li");
-    li.textContent = item;
-    elements.objectiveList.appendChild(li);
-  });
-}
-
-function renderPowerups() {
-  elements.powerGrid.innerHTML = "";
-  Object.entries(powerupDefs).forEach(([key, data]) => {
-    const card = document.createElement("div");
-    card.className = "power-card";
-    const count = state.profile.powerups[key] || 0;
-    card.innerHTML = `
-      <div class="panel-title">${data.label}</div>
-      <div class="panel-list">${data.desc}</div>
-      <button class="btn small" data-power="${key}" ${count === 0 ? "disabled" : ""}>
-        Use (${count})
-      </button>
-    `;
-    card.querySelector("button").addEventListener("click", () => usePowerup(key));
-    elements.powerGrid.appendChild(card);
-  });
-}
-
-function renderRunAchievements() {
-  elements.runAchievements.innerHTML = "";
-  if (run.achievementsUnlocked.length === 0) {
-    const li = document.createElement("li");
-    li.textContent = "No achievements yet.";
-    elements.runAchievements.appendChild(li);
-    return;
-  }
-  run.achievementsUnlocked.forEach((id) => {
-    const data = achievementList.find((a) => a.id === id);
-    const li = document.createElement("li");
-    li.textContent = data ? data.name : id;
-    elements.runAchievements.appendChild(li);
-  });
-}
-
-function updateHud() {
-  elements.hudXp.textContent = run.xpGained;
-  elements.hudScore.textContent = run.score;
-  elements.hudTime.textContent = formatTime(run.timeLeft);
-  elements.hudStreak.textContent = run.streak;
-  elements.hudCombo.textContent = `x${run.combo}`;
-  elements.hudEvent.textContent = run.event ? run.event.name : "None";
-}
-
-function buildKeypad() {
-  const keys = ["7", "8", "9", "4", "5", "6", "1", "2", "3", "0", "←", "OK"];
-  keys.forEach((label) => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.textContent = label;
-    btn.addEventListener("click", () => handleKeypad(label));
-    elements.keypad.appendChild(btn);
-  });
-}
-
-function handleKeypad(label) {
-  if (label === "OK") {
-    handleSubmit();
-    return;
-  }
-  if (label === "←") {
-    elements.answerInput.value = elements.answerInput.value.slice(0, -1);
-    return;
-  }
-  elements.answerInput.value += label;
-  elements.answerInput.focus();
-}
-
-function handleSubmit() {
-  if (!run.active) return;
-  const current = run.currentQuestion;
-  if (!current) return;
-  const value = elements.answerInput.value.trim();
-  if (current.mode === "choice") return;
-  if (value === "") return;
-  const numeric = Number(value);
-  submitAnswer(numeric);
-}
-
-function submitAnswer(answer) {
-  const current = run.currentQuestion;
-  if (!current) return;
-  elements.answerInput.value = "";
-  const isCorrect = answer === current.answer;
-  handleResult(isCorrect);
-}
-
-function submitChoice(answer) {
-  const current = run.currentQuestion;
-  if (!current) return;
-  const isCorrect = answer === current.answer;
-  handleResult(isCorrect);
-}
-
-function handleResult(isCorrect) {
-  run.questions += 1;
-  if (isCorrect) {
-    run.correct += 1;
-    run.streak += 1;
-    if (run.streak % 3 === 0) run.combo += 1;
-    if (run.combo > run.comboPeak) run.comboPeak = run.combo;
-    const baseXp = 10 + run.mission.difficulty * 3;
-    const eventMultiplier = run.event && run.event.id === "overclock" ? 2 : 1;
-    let xpGain = Math.round(baseXp * run.combo * eventMultiplier);
-    let scoreGain = xpGain * 2;
-    if (run.riskArmed) {
-      xpGain *= 3;
-      scoreGain *= 2;
-      run.riskArmed = false;
-      unlockAchievement("risk-taker");
+  const GameState = {
+    player: {
+      xp: 0,
+      level: 1,
+      unlockedMission: 1,
+      bestStreak: 0
+    },
+    run: null,
+    settings: {
+      baseXP: 120
+    },
+    inventory: {
+      timeBoost: 2,
+      doubleXP: 1,
+      skip: 2,
+      freeze: 1
+    },
+    achievements: {
+      unlocked: []
     }
-    run.xpGained += xpGain;
-    run.score += scoreGain;
-    elements.feedback.textContent = `Correct. +${xpGain} XP`;
-    if (run.event && run.event.id === "flux") {
-      run.streak += 1;
-      elements.feedback.textContent += " | Flux bonus +1 streak";
+  };
+
+  const Storage = {
+    load() {
+      try {
+        const stored = JSON.parse(localStorage.getItem('neonRiftState') || '{}');
+        if (stored.player) {
+          GameState.player = { ...GameState.player, ...stored.player };
+        }
+        if (stored.inventory) {
+          GameState.inventory = { ...GameState.inventory, ...stored.inventory };
+        }
+        if (stored.achievements) {
+          GameState.achievements = { ...GameState.achievements, ...stored.achievements };
+        }
+      } catch (err) {
+        // ignore
+      }
+    },
+    save() {
+      localStorage.setItem(
+        'neonRiftState',
+        JSON.stringify({
+          player: GameState.player,
+          inventory: GameState.inventory,
+          achievements: GameState.achievements
+        })
+      );
     }
-  } else {
-    run.streak = 0;
-    run.combo = 1;
-    if (run.riskArmed) {
-      run.xpGained = Math.max(0, run.xpGained - 20);
-      run.riskArmed = false;
-      elements.feedback.textContent = "Risk failed. XP drained.";
-    } else {
-      elements.feedback.textContent = "Incorrect. Stabilize and retry.";
+  };
+
+  const DifficultyScaler = {
+    getRange(level, performance) {
+      const base = 6 + level * 2 + performance * 2;
+      return Utils.clamp(base, 8, 60);
+    },
+    getTimeLimit(level, missionType) {
+      const base = 45 - Math.min(level * 1.1, 18);
+      const mod = missionType === 'speed' ? -6 : 0;
+      const bossMod = missionType === 'boss' ? -4 : 0;
+      return Utils.clamp(base + mod + bossMod, 24, 60);
     }
-  }
+  };
 
-  updateAchievementsOnResult();
-  updateHud();
-  updateProgress();
-  nextQuestionOrEnd();
-}
+  const MissionManager = {
+    missions: [],
+    init() {
+      const types = ['speed', 'comparison', 'memory', 'pattern', 'logic', 'pressure'];
+      for (let i = 1; i <= 40; i += 1) {
+        const boss = i % 4 === 0;
+        this.missions.push({
+          id: i,
+          title: boss ? `Boss Rift ${i}` : `Mission ${i}`,
+          type: boss ? 'boss' : types[(i - 1) % types.length],
+          objective: boss ? 'Survive the hybrid breach' : `Complete ${10 + i} questions`,
+          target: boss ? 14 + i : 10 + i,
+          boss
+        });
+      }
+    },
+    getMission(id) {
+      return this.missions.find((m) => m.id === id);
+    }
+  };
 
-function nextQuestionOrEnd() {
-  if (run.questions >= run.mission.targetCount) {
-    endMission();
-    return;
-  }
-  nextQuestion();
-}
+  const QuestionEngine = {
+    memoryStack: [],
+    generate(mission, level, performance) {
+      const types = {
+        speed: ['arithmetic', 'comparison'],
+        comparison: ['comparison', 'arithmetic'],
+        memory: ['memory', 'arithmetic'],
+        pattern: ['pattern', 'arithmetic'],
+        logic: ['logic', 'comparison'],
+        pressure: ['arithmetic', 'comparison', 'pattern'],
+        boss: ['boss', 'glitch', 'memory', 'pattern', 'comparison']
+      };
+      const typePool = types[mission.type] || ['arithmetic'];
+      const chosen = Utils.pick(typePool);
+      const range = DifficultyScaler.getRange(level, performance);
 
-function nextQuestion() {
-  maybeTriggerEvent();
-  const question = buildQuestion(run.mission);
-  run.currentQuestion = question;
-  renderQuestion(question);
-}
+      if (chosen === 'glitch') return this.generateGlitch(range);
+      if (chosen === 'memory') return this.generateMemory(range);
+      if (chosen === 'pattern') return this.generatePattern(range);
+      if (chosen === 'comparison') return this.generateComparison(range);
+      if (chosen === 'logic') return this.generateLogicBreach(range);
+      if (chosen === 'boss') return this.generateBossHybrid(range);
+      return this.generateArithmetic(range);
+    },
+    generateArithmetic(range) {
+      const a = Utils.randInt(2, range);
+      const b = Utils.randInt(2, range);
+      const ops = ['+', '-', '*'];
+      const op = Utils.pick(ops);
+      let answer = 0;
+      if (op === '+') answer = a + b;
+      if (op === '-') answer = a - b;
+      if (op === '*') answer = a * b;
+      const choices = Utils.shuffle([answer, answer + Utils.randInt(1, 6), answer - Utils.randInt(1, 6), answer + Utils.randInt(7, 12)]);
+      return {
+        type: 'Arithmetic Burst',
+        text: `${a} ${op} ${b}`,
+        answer: answer.toString(),
+        choices: choices.map((c) => c.toString()),
+        input: false
+      };
+    },
+    generateComparison(range) {
+      const a = Utils.randInt(2, range);
+      const b = Utils.randInt(2, range);
+      const c = Utils.randInt(2, range);
+      const d = Utils.randInt(2, range);
+      const left = a + b;
+      const right = c + d;
+      const answer = left === right ? '=' : left > right ? '>' : '<';
+      return {
+        type: 'Comparison Lock',
+        text: `${a} + ${b} ? ${c} + ${d}`,
+        answer,
+        choices: ['>', '<', '='],
+        input: false
+      };
+    },
+    generateMemory(range) {
+      const shouldAsk = this.memoryStack.length > 3 && Math.random() < 0.5;
+      if (shouldAsk) {
+        const memory = Utils.pick(this.memoryStack);
+        const choices = Utils.shuffle([
+          memory.answer,
+          (memory.answer + Utils.randInt(1, 8)).toString(),
+          (memory.answer - Utils.randInt(1, 5)).toString(),
+          (memory.answer + Utils.randInt(9, 15)).toString()
+        ]);
+        return {
+          type: 'Memory Echo',
+          text: `Recall: ${memory.text} = ?`,
+          answer: memory.answer.toString(),
+          choices,
+          input: false,
+          meta: { memory: true }
+        };
+      }
+      const eq = this.generateArithmetic(range);
+      this.memoryStack.push({ text: eq.text, answer: Number(eq.answer) });
+      if (this.memoryStack.length > 8) this.memoryStack.shift();
+      return {
+        ...eq,
+        type: 'Memory Encode'
+      };
+    },
+    generatePattern(range) {
+      const start = Utils.randInt(2, range / 2);
+      const diff = Utils.randInt(2, 6 + Math.floor(range / 10));
+      const seq = [start, start + diff, start + diff * 2, start + diff * 3];
+      const answer = start + diff * 4;
+      const text = `${seq.join('  ')}  ?`;
+      const choices = Utils.shuffle([
+        answer,
+        answer + diff,
+        answer - diff,
+        answer + Utils.randInt(3, 9)
+      ]).map((c) => c.toString());
+      return {
+        type: 'Pattern Rift',
+        text,
+        answer: answer.toString(),
+        choices,
+        input: false
+      };
+    },
+    generateLogicBreach(range) {
+      const a = Utils.randInt(2, range);
+      const b = Utils.randInt(2, range);
+      const c = Utils.randInt(2, range);
+      const answer = a * b - c;
+      const text = `(${a} × ${b}) − ${c}`;
+      return {
+        type: 'Logic Breach',
+        text,
+        answer: answer.toString(),
+        choices: [],
+        input: true
+      };
+    },
+    generateGlitch(range) {
+      const a = Utils.randInt(2, range);
+      const b = Utils.randInt(2, range);
+      const ops = ['+', '-', '×', '÷'];
+      const op = Utils.pick(ops);
+      let answer = '?';
+      const choices = Utils.shuffle(ops);
+      const text = `${a}  ?  ${b}  = ${this.resolveOp(a, b, op)}`;
+      return {
+        type: 'AI Glitch Repair',
+        text,
+        answer: op,
+        choices,
+        input: false
+      };
+    },
+    generateBossHybrid(range) {
+      const partA = this.generateArithmetic(range + 10);
+      const partB = this.generatePattern(range);
+      const text = `${partA.text}  |  ${partB.text}`;
+      const combined = `${partA.answer}-${partB.answer}`;
+      const choices = Utils.shuffle([
+        combined,
+        `${partA.answer}-${Number(partB.answer) + 2}`,
+        `${Number(partA.answer) + 2}-${partB.answer}`,
+        `${Number(partA.answer) - 3}-${Number(partB.answer) + 1}`
+      ]);
+      return {
+        type: 'Boss Hybrid',
+        text,
+        answer: combined,
+        choices,
+        input: false
+      };
+    },
+    resolveOp(a, b, op) {
+      if (op === '+') return a + b;
+      if (op === '-') return a - b;
+      if (op === '×') return a * b;
+      if (op === '÷') return Math.round((a / b) * 100) / 100;
+      return 0;
+    }
+  };
 
-function renderQuestion(question) {
-  elements.choiceRow.innerHTML = "";
-  elements.choiceRow.classList.add("hidden");
-  elements.inputRow.classList.remove("hidden");
-  elements.answerInput.value = "";
-  elements.answerInput.focus();
-  elements.questionText.textContent = question.prompt;
-  elements.questionSub.textContent = question.sub || "";
-
-  if (question.mode === "choice") {
-    elements.inputRow.classList.add("hidden");
-    elements.choiceRow.classList.remove("hidden");
-    question.choices.forEach((choice) => {
-      const btn = document.createElement("button");
-      btn.className = "btn ghost";
-      btn.textContent = choice.label;
-      btn.addEventListener("click", () => submitChoice(choice.value));
-      elements.choiceRow.appendChild(btn);
-    });
-  }
-
-  if (question.mode === "memory") {
-    elements.questionSub.textContent = "Memorize this expression";
-    setTimeout(() => {
-      if (run.currentQuestion !== question) return;
-      elements.questionText.textContent = "What was the answer?";
-      elements.questionSub.textContent = question.memoryPrompt;
-    }, question.revealDelay);
-  }
-}
-
-function buildQuestion(mission) {
-  if (mission.isBoss) {
-    return buildBossQuestion(mission);
-  }
-  if (useMemoryEcho()) return buildMemoryEcho();
-  if (Math.random() < 0.12) return buildGlitch(mission);
-  switch (mission.type) {
-    case "compare":
-      return buildComparison(mission);
-    case "memory":
-      return buildMemory(mission);
-    case "pattern":
-      return buildPattern(mission);
-    case "accuracy":
-      return buildArithmetic(mission, ["+", "-", "*"]);
-    case "time":
-      return buildArithmetic(mission, ["+", "-", "*"]);
-    default:
-      return buildArithmetic(mission, ["+", "-", "*"]);
-  }
-}
-
-function buildArithmetic(mission, ops) {
-  const range = 6 + mission.difficulty * 3;
-  const a = rand(2, range);
-  const b = rand(2, range);
-  const op = ops[rand(0, ops.length - 1)];
-  let answer;
-  if (op === "+") answer = a + b;
-  if (op === "-") answer = a - b;
-  if (op === "*") answer = a * b;
-  if (op === "/") answer = Math.round(a / b);
-  const prompt = `${a} ${op} ${b} = ?`;
-  storeMemory(prompt, answer);
-  return { prompt, answer, mode: "input" };
-}
-
-function buildComparison(mission) {
-  const range = 8 + mission.difficulty * 4;
-  const left = rand(2, range) * rand(2, 6);
-  const right = rand(2, range) + rand(2, range);
-  const prompt = "Which side is larger?";
-  const answer = left > right ? "L" : "R";
-  storeMemory(`${left} vs ${right}`, answer);
-  return {
-    prompt,
-    sub: `${left}  vs  ${right}`,
-    answer,
-    mode: "choice",
-    choices: [
-      { label: "Left", value: "L" },
-      { label: "Right", value: "R" },
+  const EventSystem = {
+    current: null,
+    timer: 0,
+    available: [
+      { id: 'doubleXP', name: 'Double XP Surge', effect: 'doubleXP' },
+      { id: 'slowmo', name: 'Slow Motion', effect: 'slowmo' },
+      { id: 'invert', name: 'Inverted Reality', effect: 'invert' },
+      { id: 'glitch', name: 'Glitch Storm', effect: 'glitch' },
+      { id: 'distort', name: 'Time Distortion', effect: 'distort' }
     ],
-  };
-}
-
-function buildMemory(mission) {
-  const range = 5 + mission.difficulty * 2;
-  const a = rand(2, range);
-  const b = rand(2, range);
-  const answer = a + b;
-  const prompt = `${a} + ${b} = ?`;
-  storeMemory(prompt, answer);
-  return {
-    prompt,
-    answer,
-    mode: "memory",
-    revealDelay: 1200,
-    memoryPrompt: `${a} + ${b}`,
-  };
-}
-
-function buildPattern(mission) {
-  const start = rand(2, 8 + mission.difficulty);
-  const step = rand(2, 4 + mission.difficulty);
-  const seq = [start, start + step, start + step * 2, start + step * 3];
-  const prompt = `${seq[0]}, ${seq[1]}, ${seq[2]}, ?`;
-  const answer = seq[3];
-  storeMemory(prompt, answer);
-  return { prompt, answer, mode: "input" };
-}
-
-function buildGlitch(mission) {
-  const range = 8 + mission.difficulty * 3;
-  const a = rand(2, range);
-  const b = rand(2, range);
-  const answer = a + b;
-  const prompt = `Corrupted: ${a} + ? = ${answer}`;
-  storeMemory(prompt, b);
-  return { prompt, answer: b, mode: "input", sub: "AI Glitch detected. Repair the missing value." };
-}
-
-function buildMemoryEcho() {
-  const echo = run.memory[rand(0, run.memory.length - 1)];
-  return {
-    prompt: "Memory Echo",
-    sub: `${echo.prompt}`,
-    answer: echo.answer,
-    mode: "input",
-  };
-}
-
-function buildBossQuestion(mission) {
-  const roll = Math.random();
-  if (roll < 0.33) return buildArithmetic(mission, ["+", "-", "*"]);
-  if (roll < 0.66) return buildComparison(mission);
-  return buildGlitch(mission);
-}
-
-function storeMemory(prompt, answer) {
-  run.memory.push({ prompt, answer });
-  if (run.memory.length > 6) run.memory.shift();
-}
-
-function useMemoryEcho() {
-  if (run.memory.length < 3) return false;
-  return Math.random() < 0.18;
-}
-
-function maybeTriggerEvent() {
-  const now = performance.now();
-  if (run.event && now < run.eventEnds) return;
-  run.event = null;
-  if (Math.random() < 0.25) {
-    const chosen = eventDefs[rand(0, eventDefs.length - 1)];
-    run.event = chosen;
-    run.eventEnds = now + 10000;
-    run.eventsTriggered += 1;
-    elements.runStatus.textContent = `${chosen.name} engaged`;
-    elements.feedback.textContent = chosen.desc;
-  }
-}
-
-function tick() {
-  if (!run.active) return;
-  const now = performance.now();
-  const delta = (now - run.lastTick) / 1000;
-  run.lastTick = now;
-  if (now < run.freezeUntil) {
-    updateHud();
-    return;
-  }
-  const timeScale = run.event && run.event.id === "dilation" ? 0.5 : 1;
-  run.timeLeft = Math.max(0, run.timeLeft - delta * timeScale);
-  updateHud();
-  if (run.timeLeft <= 0) {
-    endMission();
-  }
-}
-
-function updateProgress() {
-  const progress = Math.min(1, run.questions / run.mission.targetCount);
-  elements.progressFill.style.width = `${progress * 100}%`;
-}
-
-function endMission() {
-  cleanupRun();
-  run.active = false;
-  const accuracy = run.questions === 0 ? 0 : Math.round((run.correct / run.questions) * 100);
-  const timeLeft = Math.round(run.timeLeft);
-  const success = accuracy >= run.mission.minAccuracy && run.questions >= run.mission.targetCount;
-  if (success) {
-    state.profile.xp += run.xpGained;
-    state.profile.missionsCompleted += 1;
-    if (run.mission.id >= state.missionUnlock && run.mission.id < missions.length) {
-      state.missionUnlock = run.mission.id + 1;
+    reset() {
+      this.current = null;
+      this.timer = 0;
+      this.clearVisuals();
+    },
+    maybeTrigger(run) {
+      if (this.current || run.questionIndex < 3) return;
+      if (Math.random() < 0.18) {
+        this.current = Utils.pick(this.available);
+        this.timer = 3 + Utils.randInt(0, 2);
+        this.applyVisuals();
+        UIRenderer.setStatus(`${this.current.name} activated.`);
+      }
+    },
+    tick() {
+      if (!this.current) return;
+      this.timer -= 1;
+      if (this.timer <= 0) {
+        this.clearVisuals();
+        this.current = null;
+        UIRenderer.setStatus('Rift event stabilized.');
+      }
+    },
+    applyVisuals() {
+      if (!this.current) return;
+      el.riftOverlay.classList.remove('hidden');
+      el.riftOverlay.classList.add('active');
+      if (this.current.effect === 'invert') {
+        document.body.classList.add('invert');
+      }
+      if (this.current.effect === 'glitch') {
+        document.body.classList.add('glitch');
+      }
+    },
+    clearVisuals() {
+      el.riftOverlay.classList.remove('active');
+      el.riftOverlay.classList.add('hidden');
+      document.body.classList.remove('invert', 'glitch');
+    },
+    applyScore(xp) {
+      if (!this.current) return xp;
+      if (this.current.effect === 'doubleXP') return xp * 2;
+      return xp;
     }
-  }
+  };
 
-  state.profile.level = levelFromXp(state.profile.xp);
-  state.bestScores[run.mission.id] = Math.max(state.bestScores[run.mission.id] || 0, run.score);
-  awardPowerups(success);
-  finalizeAchievements(success, accuracy, timeLeft);
-  saveState();
-  renderHome();
-  renderMissions();
-  renderResults(success, accuracy, timeLeft);
-  setScreen("results");
-}
-
-function cleanupRun() {
-  if (run.timerId) clearInterval(run.timerId);
-  run.timerId = null;
-}
-
-function renderResults(success, accuracy, timeLeft) {
-  elements.resultsTitle.textContent = success ? "Mission Complete" : "Mission Failed";
-  elements.resultsSubtitle.textContent = success
-    ? "Rift stabilized. System secure."
-    : "Rift destabilized. Train and retry.";
-
-  const summary = [
-    `Score: ${run.score}`,
-    `XP gained: ${run.xpGained}`,
-    `Accuracy: ${accuracy}%`,
-    `Prompts answered: ${run.questions}`,
-    `Combo peak: x${run.comboPeak}`,
-    `Time remaining: ${formatTime(timeLeft)}`,
-  ];
-  renderList(elements.resultsSummary, summary);
-
-  const rewards = [];
-  rewards.push(success ? "Mission reward unlocked" : "No mission reward");
-  rewards.push(`Power-ups earned: ${run.rewardedPowerups || 0}`);
-  renderList(elements.resultsRewards, rewards);
-
-  const achievements = run.achievementsUnlocked.map((id) => {
-    const data = achievementList.find((a) => a.id === id);
-    return data ? data.name : id;
-  });
-  renderList(elements.resultsAchievements, achievements.length ? achievements : ["None"]);
-}
-
-function renderList(el, items) {
-  el.innerHTML = "";
-  items.forEach((item) => {
-    const li = document.createElement("li");
-    li.textContent = item;
-    el.appendChild(li);
-  });
-}
-
-function updateDailyRewardUI() {
-  const today = new Date().toISOString().slice(0, 10);
-  const canClaim = state.profile.daily.lastClaim !== today;
-  elements.claimReward.disabled = !canClaim;
-  elements.dailyText.textContent = canClaim
-    ? `Reward ready. Streak ${state.profile.daily.streak + 1}x.`
-    : "Reward already claimed. Return tomorrow.";
-}
-
-function claimDailyReward() {
-  const today = new Date().toISOString().slice(0, 10);
-  if (state.profile.daily.lastClaim === today) return;
-  state.profile.daily.lastClaim = today;
-  state.profile.daily.streak += 1;
-  const roll = Math.random();
-  if (roll < 0.5) {
-    const xp = 40 + state.profile.daily.streak * 10;
-    state.profile.xp += xp;
-    elements.dailyText.textContent = `Claimed +${xp} XP.`;
-  } else if (roll < 0.85) {
-    const keys = Object.keys(state.profile.powerups);
-    const pick = keys[rand(0, keys.length - 1)];
-    state.profile.powerups[pick] += 1;
-    elements.dailyText.textContent = `Claimed +1 ${powerupDefs[pick].label}.`;
-  } else {
-    state.missionUnlock = Math.min(state.missionUnlock + 1, missions.length);
-    elements.dailyText.textContent = "Bonus mission unlocked.";
-  }
-  saveState();
-  renderHome();
-  renderMissions();
-}
-
-function awardPowerups(success) {
-  if (!success) {
-    run.rewardedPowerups = 0;
-    return;
-  }
-  let earned = 0;
-  if (run.comboPeak >= 3) {
-    state.profile.powerups.double += 1;
-    earned += 1;
-  }
-  if (run.streak >= 5 || run.comboPeak >= 4) {
-    state.profile.powerups.time += 1;
-    earned += 1;
-  }
-  if (run.mission.isBoss) {
-    state.profile.powerups.skip += 1;
-    earned += 1;
-  }
-  run.rewardedPowerups = earned;
-}
-
-function finalizeAchievements(success, accuracy, timeLeft) {
-  if (success && run.mission.isBoss) unlockAchievement("boss-breaker");
-  if (accuracy === 100) unlockAchievement("flawless");
-  if (timeLeft >= Math.round(run.mission.timeLimit / 2)) unlockAchievement("speed-demon");
-  if (run.eventsTriggered >= 3) unlockAchievement("rift-tamer");
-  renderRunAchievements();
-}
-
-function updateAchievementsOnResult() {
-  if (run.correct === 1) unlockAchievement("first-blood");
-  if (run.streak >= 5) unlockAchievement("hot-streak");
-  if (run.combo >= 4) unlockAchievement("combo-master");
-  renderRunAchievements();
-}
-
-function unlockAchievement(id) {
-  if (!state.profile.achievements.includes(id)) {
-    state.profile.achievements.push(id);
-  }
-  if (!run.achievementsUnlocked.includes(id)) {
-    run.achievementsUnlocked.push(id);
-    renderRunAchievements();
-  }
-}
-
-function usePowerup(key) {
-  if (!run.active) return;
-  if ((state.profile.powerups[key] || 0) <= 0) return;
-  state.profile.powerups[key] -= 1;
-  if (key === "time") run.timeLeft += 10;
-  if (key === "double") {
-    run.event = { id: "overclock", name: "Overclock", desc: "Double XP" };
-    run.eventEnds = performance.now() + 15000;
-  }
-  if (key === "skip") {
-    elements.feedback.textContent = "Prompt skipped.";
-    nextQuestion();
-  }
-  if (key === "freeze") {
-    run.freezeUntil = performance.now() + 5000;
-    elements.feedback.textContent = "Timer frozen.";
-  }
-  renderPowerups();
-  saveState();
-}
-
-function buildMissions() {
-  const types = [
-    { id: "speed", label: "Speed Arithmetic" },
-    { id: "compare", label: "Logic Compare" },
-    { id: "memory", label: "Memory Recall" },
-    { id: "pattern", label: "Pattern Rift" },
-    { id: "accuracy", label: "Precision Focus" },
-    { id: "time", label: "Time Pressure" },
-  ];
-  const list = [];
-  for (let i = 1; i <= 16; i += 1) {
-    const isBoss = i % 4 === 0;
-    const base = types[(i - 1) % types.length];
-    const difficulty = 1 + Math.floor((i - 1) / 2);
-    const timeLimit = 30 + i * 2;
-    const targetCount = 8 + i;
-    const minAccuracy = isBoss ? 85 : base.id === "accuracy" ? 90 : 75;
-    list.push({
-      id: i,
-      title: isBoss ? "Rift Guardian" : `Tier ${Math.ceil(i / 4)} Node`,
-      type: base.id,
-      typeLabel: base.label,
-      difficulty,
-      timeLimit,
-      targetCount,
-      minAccuracy,
-      objective: `Solve ${targetCount} in ${timeLimit}s`,
-      isBoss,
-    });
-  }
-  return list;
-}
-
-function levelFromXp(xp) {
-  return Math.max(1, Math.floor(Math.sqrt(xp / 120)) + 1);
-}
-
-function formatTime(seconds) {
-  const clamped = Math.max(0, Math.floor(seconds));
-  const mins = String(Math.floor(clamped / 60)).padStart(2, "0");
-  const secs = String(clamped % 60).padStart(2, "0");
-  return `${mins}:${secs}`;
-}
-
-function rand(min, max) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
-function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-}
-
-function loadState() {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (!stored) return structuredClone(defaultState);
-  try {
-    return mergeDeep(structuredClone(defaultState), JSON.parse(stored));
-  } catch (err) {
-    return structuredClone(defaultState);
-  }
-}
-
-function mergeDeep(target, source) {
-  Object.keys(source).forEach((key) => {
-    if (source[key] && typeof source[key] === "object" && !Array.isArray(source[key])) {
-      if (!target[key]) target[key] = {};
-      mergeDeep(target[key], source[key]);
-    } else {
-      target[key] = source[key];
+  const PowerUpManager = {
+    cooldowns: {},
+    init() {
+      this.cooldowns = {
+        timeBoost: 0,
+        doubleXP: 0,
+        skip: 0,
+        freeze: 0
+      };
+    },
+    canUse(key) {
+      if (key === 'skip' && RiskMode.armed) return false;
+      return GameState.inventory[key] > 0 && this.cooldowns[key] === 0;
+    },
+    use(key) {
+      if (!this.canUse(key)) return false;
+      GameState.inventory[key] -= 1;
+      this.cooldowns[key] = 4;
+      if (key === 'timeBoost') GameState.run.time += 10;
+      if (key === 'doubleXP') GameState.run.tempDoubleXP = 3;
+      if (key === 'skip') Game.skipQuestion();
+      if (key === 'freeze') GameState.run.freeze = 5;
+      UIRenderer.animatePowerUp(key);
+      return true;
+    },
+    tick() {
+      Object.keys(this.cooldowns).forEach((key) => {
+        if (this.cooldowns[key] > 0) this.cooldowns[key] -= 1;
+      });
     }
-  });
-  return target;
-}
+  };
 
-window.addEventListener("beforeunload", saveState);
+  const AchievementManager = {
+    list: [],
+    init() {
+      this.list = [
+        { id: 'first', name: 'Boot Sequence', desc: 'Complete your first mission.', check: (s) => s.completedMissions >= 1 },
+        { id: 'streak5', name: 'Signal Lock', desc: 'Reach a 5 streak.', check: (s) => s.maxStreak >= 5 },
+        { id: 'streak10', name: 'Neon Surge', desc: 'Reach a 10 streak.', check: (s) => s.maxStreak >= 10 },
+        { id: 'combo5', name: 'Combo Pulse', desc: 'Reach a 5 combo.', check: (s) => s.maxCombo >= 5 },
+        { id: 'combo10', name: 'Combo Reactor', desc: 'Reach a 10 combo.', check: (s) => s.maxCombo >= 10 },
+        { id: 'fast', name: 'Quick Sync', desc: 'Answer within 2 seconds.', check: (s) => s.fastAnswer },
+        { id: 'perfect', name: 'Zero Deviation', desc: 'Finish with 100% accuracy.', check: (s) => s.accuracy === 1 },
+        { id: 'riskwin', name: 'Risk Protocol', desc: 'Win Risk Mode.', check: (s) => s.riskWin },
+        { id: 'glitch', name: 'Glitch Doctor', desc: 'Repair an AI glitch.', check: (s) => s.glitchRepair },
+        { id: 'memory', name: 'Echo Keeper', desc: 'Clear a Memory Echo.', check: (s) => s.memoryClear },
+        { id: 'event', name: 'Rift Rider', desc: 'Experience a rift event.', check: (s) => s.eventSeen },
+        { id: 'xp500', name: 'Rift Amplified', desc: 'Gain 500 XP total.', check: () => GameState.player.xp >= 500 },
+        { id: 'xp2000', name: 'Neural Apex', desc: 'Gain 2000 XP total.', check: () => GameState.player.xp >= 2000 },
+        { id: 'lvl5', name: 'Level 5', desc: 'Reach level 5.', check: () => GameState.player.level >= 5 },
+        { id: 'lvl10', name: 'Level 10', desc: 'Reach level 10.', check: () => GameState.player.level >= 10 },
+        { id: 'boss', name: 'Boss Breaker', desc: 'Clear a boss mission.', check: (s) => s.bossClear },
+        { id: 'daily', name: 'Daily Sync', desc: 'Claim a daily reward.', check: (s) => s.dailyClaimed },
+        { id: 'power', name: 'Power Surge', desc: 'Use 3 power-ups in a mission.', check: (s) => s.powerUses >= 3 },
+        { id: 'endurance', name: 'Endurance Run', desc: 'Answer 20 questions in a mission.', check: (s) => s.questionsAnswered >= 20 },
+        { id: 'accuracy80', name: 'Precision 80', desc: 'Finish with 80% accuracy.', check: (s) => s.accuracy >= 0.8 },
+        { id: 'accuracy90', name: 'Precision 90', desc: 'Finish with 90% accuracy.', check: (s) => s.accuracy >= 0.9 },
+        { id: 'unlock10', name: 'Sector 10', desc: 'Unlock mission 10.', check: () => GameState.player.unlockedMission >= 10 },
+        { id: 'unlock20', name: 'Sector 20', desc: 'Unlock mission 20.', check: () => GameState.player.unlockedMission >= 20 },
+        { id: 'unlock30', name: 'Sector 30', desc: 'Unlock mission 30.', check: () => GameState.player.unlockedMission >= 30 },
+        { id: 'unlock40', name: 'Sector 40', desc: 'Unlock mission 40.', check: () => GameState.player.unlockedMission >= 40 },
+        { id: 'flash', name: 'Surge Flash', desc: 'Trigger a streak flash.', check: (s) => s.flashTriggered },
+        { id: 'streak15', name: 'Streak 15', desc: 'Reach a 15 streak.', check: (s) => s.maxStreak >= 15 },
+        { id: 'combo15', name: 'Combo 15', desc: 'Reach a 15 combo.', check: (s) => s.maxCombo >= 15 },
+        { id: 'time', name: 'Time Guardian', desc: 'Finish with 20s remaining.', check: (s) => s.timeRemaining >= 20 }
+      ];
+    },
+    check(runSummary) {
+      const unlocked = [];
+      this.list.forEach((ach) => {
+        if (GameState.achievements.unlocked.includes(ach.id)) return;
+        if (ach.check(runSummary)) {
+          GameState.achievements.unlocked.push(ach.id);
+          unlocked.push(ach);
+        }
+      });
+      if (unlocked.length) {
+        UIRenderer.pushAchievements(unlocked);
+        Storage.save();
+      }
+    }
+  };
+
+  const UIRenderer = {
+    activeScreen: 'home',
+    switchScreen(name) {
+      Object.values(el.screens).forEach((screen) => screen.classList.remove('active'));
+      el.screens[name].classList.add('active');
+      this.activeScreen = name;
+    },
+    updateHome() {
+      el.stats.level.textContent = GameState.player.level;
+      el.stats.xp.textContent = GameState.player.xp;
+      el.stats.achievements.textContent = GameState.achievements.unlocked.length;
+      el.stats.streak.textContent = GameState.player.bestStreak;
+      this.updateDaily();
+    },
+    updateDaily() {
+      const lastClaim = localStorage.getItem('neonRiftDaily') || '';
+      if (lastClaim === Utils.todayKey()) {
+        el.daily.status.textContent = 'Claimed';
+        el.daily.status.style.color = 'var(--muted)';
+        el.btnClaimReward.disabled = true;
+      } else {
+        el.daily.status.textContent = 'Available';
+        el.daily.status.style.color = 'var(--lime)';
+        el.btnClaimReward.disabled = false;
+      }
+    },
+    renderMissionGrid() {
+      el.missionGrid.innerHTML = '';
+      MissionManager.missions.forEach((mission) => {
+        const card = document.createElement('div');
+        const locked = mission.id > GameState.player.unlockedMission;
+        card.className = `mission-card ${locked ? 'locked' : ''} ${mission.boss ? 'boss' : ''}`;
+        card.innerHTML = `
+          <div class="mission-title">${mission.title}</div>
+          <div class="mission-meta">${mission.objective}</div>
+          <div class="mission-meta">Type: ${mission.type.toUpperCase()}</div>
+          ${mission.boss ? '<div class="mission-badge">BOSS</div>' : ''}
+        `;
+        if (!locked) {
+          card.addEventListener('click', () => Game.startMission(mission.id));
+        }
+        el.missionGrid.appendChild(card);
+      });
+    },
+    updateHUD() {
+      const run = GameState.run;
+      if (!run) return;
+      el.hud.mission.textContent = run.mission.title;
+      el.hud.objective.textContent = run.mission.objective;
+      el.hud.xp.textContent = run.xp;
+      el.hud.score.textContent = run.score;
+      el.hud.time.textContent = Utils.formatTime(run.time);
+      el.hud.streak.textContent = run.streak;
+      el.hud.combo.textContent = run.combo;
+      el.hud.level.textContent = GameState.player.level;
+      el.hud.event.textContent = EventSystem.current ? EventSystem.current.name : 'None';
+      el.progressBar.style.width = `${Math.min(100, (run.questionIndex / run.target) * 100)}%`;
+    },
+    setQuestion(payload) {
+      el.questionType.textContent = payload.type;
+      el.question.textContent = payload.text;
+      el.choices.innerHTML = '';
+      if (payload.input) {
+        el.inputWrap.classList.remove('hidden');
+        el.answerInput.value = '';
+        el.answerInput.focus();
+      } else {
+        el.inputWrap.classList.add('hidden');
+        payload.choices.forEach((choice) => {
+          const button = document.createElement('button');
+          button.className = 'choice';
+          button.textContent = choice;
+          button.addEventListener('click', () => Game.submitAnswer(choice));
+          el.choices.appendChild(button);
+        });
+      }
+    },
+    updateObjectives(objectives) {
+      el.objectiveList.innerHTML = '';
+      objectives.forEach((obj) => {
+        const li = document.createElement('li');
+        li.textContent = obj;
+        el.objectiveList.appendChild(li);
+      });
+    },
+    updatePowerups() {
+      el.powerups.innerHTML = '';
+      const keys = [
+        { key: 'timeBoost', label: 'Time Boost', icon: '+10s' },
+        { key: 'doubleXP', label: 'Double XP', icon: 'x2' },
+        { key: 'skip', label: 'Skip', icon: '>>' },
+        { key: 'freeze', label: 'Freeze', icon: '||' }
+      ];
+      keys.forEach((item) => {
+        const btn = document.createElement('button');
+        const disabled = !PowerUpManager.canUse(item.key);
+        btn.className = `powerup-btn ${disabled ? 'disabled' : ''}`;
+        btn.innerHTML = `<span>${item.label}</span><span>${item.icon} · ${GameState.inventory[item.key]}</span>`;
+        if (!disabled) {
+          btn.addEventListener('click', () => {
+            if (PowerUpManager.use(item.key)) {
+              GameState.run.powerUses += 1;
+              UIRenderer.updatePowerups();
+              Storage.save();
+            }
+          });
+        }
+        el.powerups.appendChild(btn);
+      });
+    },
+    pushAchievements(list) {
+      list.forEach((ach) => {
+        const item = document.createElement('div');
+        item.textContent = `${ach.name} unlocked.`;
+        el.achievementFeed.prepend(item);
+        this.showAchievementPopup(ach);
+      });
+      el.stats.achievements.textContent = GameState.achievements.unlocked.length;
+    },
+    showAchievementPopup(ach) {
+      el.achievementPopup.classList.remove('hidden');
+      el.achievementPopup.textContent = `${ach.name} — ${ach.desc}`;
+      setTimeout(() => {
+        el.achievementPopup.classList.add('hidden');
+      }, 2400);
+    },
+    setStatus(text) {
+      el.status.textContent = text;
+    },
+    setFeedback(text, tone) {
+      el.feedback.textContent = text;
+      el.feedback.className = `feedback ${tone || ''}`;
+    },
+    animatePowerUp(key) {
+      el.flash.classList.remove('hidden');
+      el.flash.classList.add('active');
+      setTimeout(() => {
+        el.flash.classList.remove('active');
+        el.flash.classList.add('hidden');
+      }, 420);
+      this.setStatus(`${key} activated.`);
+    },
+    renderResults(summary) {
+      el.result.title.textContent = summary.success ? 'Mission Complete' : 'Mission Failed';
+      el.result.xp.textContent = summary.xpGained;
+      el.result.accuracy.textContent = `${Math.round(summary.accuracy * 100)}%`;
+      el.result.streak.textContent = summary.maxStreak;
+      el.result.combo.textContent = summary.maxCombo;
+      el.result.rewards.textContent = summary.rewards;
+    }
+  };
+
+  const Game = {
+    timerId: null,
+    startMission(id) {
+      const mission = MissionManager.getMission(id || GameState.player.unlockedMission);
+      if (!mission) return;
+
+      const run = {
+        mission,
+        target: mission.target,
+        questionIndex: 0,
+        score: 0,
+        xp: 0,
+        streak: 0,
+        combo: 0,
+        maxStreak: 0,
+        maxCombo: 0,
+        time: DifficultyScaler.getTimeLimit(GameState.player.level, mission.type),
+        correct: 0,
+        total: 0,
+        powerUses: 0,
+        fastAnswer: false,
+        memoryClear: false,
+        glitchRepair: false,
+        riskWin: false,
+        eventSeen: false,
+        flashTriggered: false,
+        bossClear: mission.boss,
+        dailyClaimed: false,
+        questionsAnswered: 0,
+        tempDoubleXP: 0,
+        skipNext: false,
+        freeze: 0,
+        startedAt: performance.now(),
+        lastQuestionTime: performance.now()
+      };
+
+      GameState.run = run;
+      PowerUpManager.init();
+      EventSystem.reset();
+      QuestionEngine.memoryStack = [];
+      UIRenderer.updatePowerups();
+      UIRenderer.updateObjectives([mission.objective, 'Maintain streaks for bonus XP', 'Watch for rift events']);
+      UIRenderer.switchScreen('game');
+      UIRenderer.setStatus('Mission online.');
+      this.nextQuestion();
+      this.startTimer();
+    },
+    startTimer() {
+      if (this.timerId) clearInterval(this.timerId);
+      this.timerId = setInterval(() => {
+        const run = GameState.run;
+        if (!run) return;
+        if (run.freeze > 0) {
+          run.freeze -= 1;
+        } else {
+          run.time -= EventSystem.current && EventSystem.current.effect === 'slowmo' ? 0.6 : 1;
+        }
+        if (EventSystem.current && EventSystem.current.effect === 'distort') {
+          run.time -= Math.random() < 0.3 ? -1.2 : 0.8;
+        }
+        if (run.time <= 0) {
+          run.time = 0;
+          this.finishMission(false);
+          return;
+        }
+        UIRenderer.updateHUD();
+      }, 1000);
+    },
+    stopTimer() {
+      if (this.timerId) {
+        clearInterval(this.timerId);
+        this.timerId = null;
+      }
+    },
+    nextQuestion() {
+      const run = GameState.run;
+      if (!run) return;
+      run.questionIndex += 1;
+      run.questionsAnswered += 1;
+      if (run.questionIndex > run.target) {
+        this.finishMission(true);
+        return;
+      }
+      EventSystem.maybeTrigger(run);
+      if (EventSystem.current) run.eventSeen = true;
+
+      const performanceScore = run.correct / Math.max(1, run.total);
+      let question = QuestionEngine.generate(run.mission, GameState.player.level, performanceScore * 10);
+      if (RiskMode.armed) {
+        question = QuestionEngine.generateBossHybrid(DifficultyScaler.getRange(GameState.player.level + 2, performanceScore * 12));
+        question.type = 'Risk Protocol';
+      }
+      run.currentQuestion = question;
+      run.lastQuestionTime = performance.now();
+      UIRenderer.setQuestion(question);
+      UIRenderer.updateHUD();
+      UIRenderer.setFeedback('');
+      UIRenderer.setStatus('Answer quickly for bonuses.');
+    },
+    skipQuestion() {
+      const run = GameState.run;
+      if (!run) return;
+      run.total += 1;
+      run.combo = Math.max(0, run.combo - 1);
+      UIRenderer.setFeedback('Skipped.', 'neutral');
+      UIRenderer.setStatus('Question skipped.');
+      PowerUpManager.tick();
+      EventSystem.tick();
+      UIRenderer.updateHUD();
+      UIRenderer.updatePowerups();
+      setTimeout(() => this.nextQuestion(), 300);
+    },
+    submitAnswer(value) {
+      const run = GameState.run;
+      if (!run || !run.currentQuestion) return;
+      const answer = run.currentQuestion.answer.toString();
+      const inputValue = value !== undefined ? value.toString() : el.answerInput.value.trim();
+      if (inputValue.length === 0) return;
+
+      run.total += 1;
+      const elapsed = (performance.now() - run.lastQuestionTime) / 1000;
+      if (elapsed <= 2) run.fastAnswer = true;
+
+      let correct = inputValue === answer;
+
+      if (correct) {
+        run.correct += 1;
+        run.streak += 1;
+        run.combo = Math.min(run.combo + 1, 20);
+        run.maxStreak = Math.max(run.maxStreak, run.streak);
+        run.maxCombo = Math.max(run.maxCombo, run.combo);
+
+        const baseXP = GameState.settings.baseXP + run.combo * 4;
+        const xpGain = EventSystem.applyScore(baseXP + run.streak * 2);
+        const bonusXP = run.tempDoubleXP > 0 ? xpGain * 2 : xpGain;
+        run.xp += bonusXP;
+        run.score += 10 + run.combo * 2;
+
+        if (run.tempDoubleXP > 0) run.tempDoubleXP -= 1;
+
+        if (run.currentQuestion.type === 'Memory Echo') run.memoryClear = true;
+        if (run.currentQuestion.type === 'AI Glitch Repair') run.glitchRepair = true;
+
+        if (run.streak > 0 && run.streak % 5 === 0) {
+          run.flashTriggered = true;
+          UIRenderer.setStatus(`Streak ${run.streak} activated.`);
+          el.flash.classList.remove('hidden');
+          el.flash.classList.add('active');
+          setTimeout(() => {
+            el.flash.classList.remove('active');
+            el.flash.classList.add('hidden');
+          }, 420);
+        }
+
+        UIRenderer.setFeedback('Correct.', 'good');
+      } else {
+        run.streak = 0;
+        run.combo = Math.max(0, run.combo - 2);
+        UIRenderer.setFeedback(`Incorrect. Answer was ${answer}.`, 'bad');
+      }
+
+      RiskMode.resolve(correct);
+      PowerUpManager.tick();
+      EventSystem.tick();
+      UIRenderer.updatePowerups();
+      UIRenderer.updateHUD();
+
+      setTimeout(() => this.nextQuestion(), 450);
+    },
+    finishMission(success) {
+      this.stopTimer();
+      const run = GameState.run;
+      if (!run) return;
+      RiskMode.armed = false;
+
+      const accuracy = run.correct / Math.max(1, run.total);
+      const xpGained = Math.round(run.xp * (success ? 1 : 0.5));
+
+      GameState.player.xp += xpGained;
+      GameState.player.level = Progression.getLevel(GameState.player.xp);
+      GameState.player.bestStreak = Math.max(GameState.player.bestStreak, run.maxStreak);
+      if (success && GameState.player.unlockedMission < run.mission.id + 1) {
+        GameState.player.unlockedMission = Math.min(40, run.mission.id + 1);
+      }
+
+      const summary = {
+        success,
+        xpGained,
+        accuracy,
+        maxStreak: run.maxStreak,
+        maxCombo: run.maxCombo,
+        rewards: success ? 'XP + Unlocks' : 'Partial XP',
+        completedMissions: success ? 1 : 0,
+        bossClear: success && run.mission.boss,
+        powerUses: run.powerUses,
+        fastAnswer: run.fastAnswer,
+        glitchRepair: run.glitchRepair,
+        memoryClear: run.memoryClear,
+        riskWin: run.riskWin,
+        eventSeen: run.eventSeen,
+        flashTriggered: run.flashTriggered,
+        questionsAnswered: run.questionsAnswered,
+        accuracyRaw: accuracy,
+        timeRemaining: run.time,
+        dailyClaimed: run.dailyClaimed
+      };
+
+      AchievementManager.check({
+        ...summary,
+        accuracy
+      });
+
+      Storage.save();
+      UIRenderer.renderResults(summary);
+      UIRenderer.updateHome();
+      UIRenderer.switchScreen('result');
+      GameState.run = null;
+    }
+  };
+
+  const Progression = {
+    getLevel(xp) {
+      let level = 1;
+      let threshold = 200;
+      let remaining = xp;
+      while (remaining >= threshold) {
+        remaining -= threshold;
+        level += 1;
+        threshold = Math.floor(threshold * 1.15);
+      }
+      return level;
+    }
+  };
+
+  const RiskMode = {
+    armed: false,
+    arm() {
+      if (!GameState.run || this.armed) return;
+      this.armed = true;
+      UIRenderer.setStatus('Risk Mode armed: next question is high stakes.');
+    },
+    resolve(correct) {
+      if (!this.armed) return;
+      const run = GameState.run;
+      if (!run) return;
+      if (correct) {
+        run.xp += 160;
+        run.score += 30;
+        run.riskWin = true;
+        UIRenderer.setStatus('Risk Mode success.');
+      } else {
+        run.xp = Math.max(0, run.xp - 80);
+        UIRenderer.setStatus('Risk Mode failed.');
+      }
+      this.armed = false;
+    }
+  };
+
+  const DailyReward = {
+    claim() {
+      const today = Utils.todayKey();
+      const lastClaim = localStorage.getItem('neonRiftDaily') || '';
+      if (lastClaim === today) return;
+      localStorage.setItem('neonRiftDaily', today);
+      GameState.player.xp += 120;
+      GameState.inventory.timeBoost += 1;
+      GameState.inventory.doubleXP += 1;
+      GameState.inventory.skip += 1;
+      GameState.player.level = Progression.getLevel(GameState.player.xp);
+      Storage.save();
+      UIRenderer.updateHome();
+      UIRenderer.setStatus('Daily reward claimed.');
+      AchievementManager.check({ dailyClaimed: true });
+    }
+  };
+
+  const InputHandlers = {
+    init() {
+      el.btnHome.addEventListener('click', () => {
+        if (GameState.run) Game.finishMission(false);
+        UIRenderer.switchScreen('home');
+      });
+      el.btnMissions.addEventListener('click', () => {
+        if (GameState.run) Game.finishMission(false);
+        UIRenderer.switchScreen('missions');
+      });
+      el.btnStart.addEventListener('click', () => Game.startMission(GameState.player.unlockedMission));
+      el.btnMissionSelect.addEventListener('click', () => UIRenderer.switchScreen('missions'));
+      el.btnClaimReward.addEventListener('click', () => DailyReward.claim());
+      el.btnSubmit.addEventListener('click', () => Game.submitAnswer());
+      el.answerInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') Game.submitAnswer();
+      });
+      el.btnRisk.addEventListener('click', () => RiskMode.arm());
+      el.btnNext.addEventListener('click', () => Game.startMission(Math.min(40, GameState.player.unlockedMission)));
+      el.btnReplay.addEventListener('click', () => Game.startMission(GameState.player.unlockedMission));
+      el.btnHomeResult.addEventListener('click', () => UIRenderer.switchScreen('home'));
+    }
+  };
+
+  const App = {
+    init() {
+      Storage.load();
+      MissionManager.init();
+      AchievementManager.init();
+      UIRenderer.updateHome();
+      UIRenderer.renderMissionGrid();
+      UIRenderer.switchScreen('home');
+      InputHandlers.init();
+      UIRenderer.setStatus('Mainframe ready.');
+    }
+  };
+
+  document.addEventListener('DOMContentLoaded', App.init);
+})();

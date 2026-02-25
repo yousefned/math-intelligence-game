@@ -1,213 +1,203 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Math Intelligence Game: Neon Rift</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;600;700&family=Space+Grotesk:wght@300;400;500;600&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="/style.css" />
-  </head>
-  <body>
-    <div class="bg" aria-hidden="true">
-      <div class="bg-grid"></div>
-      <div class="bg-rift"></div>
-      <div class="bg-glow"></div>
-      <div class="bg-particles"></div>
-    </div>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Math Intelligence Game: Neon Rift</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app" class="app">
+    <div class="ambient-grid"></div>
+    <div class="scanlines"></div>
+    <div id="rift-overlay" class="rift-overlay hidden"></div>
+    <div id="flash" class="flash hidden"></div>
 
-    <main id="app" class="app">
-      <section id="home" class="screen active" aria-labelledby="homeTitle">
-        <header class="topbar">
-          <div class="brand">
-            <span class="brand-chip">AI MAINFRAME</span>
-            <span class="brand-title">Neon Rift Console</span>
-          </div>
-          <div class="topbar-actions">
-            <button id="soundToggle" class="btn ghost" aria-pressed="true">
-              Sound: <span id="soundState">On</span>
-            </button>
-            <button id="resetProgress" class="btn ghost">Reset</button>
-          </div>
-        </header>
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark"></div>
+        <div>
+          <div class="brand-title">NEON RIFT</div>
+          <div class="brand-sub">Cognitive Training Console</div>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button id="btn-home" class="ghost">Home</button>
+        <button id="btn-missions" class="ghost">Missions</button>
+      </div>
+    </header>
 
-        <div class="home-hero">
-          <div>
-            <h1 id="homeTitle" class="title">Math Intelligence Game: Neon Rift</h1>
-            <p class="subtitle">
-              Neural link established. Complete math missions, stabilize the rift, and build elite cognitive power.
-            </p>
-            <div class="home-actions">
-              <button id="startRun" class="btn primary">Start Mission Run</button>
-              <button id="openMissions" class="btn secondary">Mission Select</button>
+    <main class="stage">
+      <section id="screen-home" class="screen active">
+        <div class="hero">
+          <div class="hero-text">
+            <div class="tag">ELITE NEURAL PROTOCOL</div>
+            <h1>Math Intelligence Game: Neon Rift</h1>
+            <p>Train speed, memory, logic, and focus through a living AI mainframe.</p>
+            <div class="hero-actions">
+              <button id="btn-start" class="primary">Start Mission Run</button>
+              <button id="btn-mission-select" class="secondary">Mission Select</button>
             </div>
           </div>
-          <div class="home-panel">
+          <div class="hero-panel">
             <div class="stat-grid">
-              <div class="stat">
-                <span class="label">Level</span>
-                <span id="homeLevel" class="value">1</span>
+              <div class="stat-card">
+                <div class="stat-label">Level</div>
+                <div id="stat-level" class="stat-value">1</div>
               </div>
-              <div class="stat">
-                <span class="label">Total XP</span>
-                <span id="homeXp" class="value">0</span>
+              <div class="stat-card">
+                <div class="stat-label">XP</div>
+                <div id="stat-xp" class="stat-value">0</div>
               </div>
-              <div class="stat">
-                <span class="label">Missions</span>
-                <span id="homeMissions" class="value">0</span>
+              <div class="stat-card">
+                <div class="stat-label">Achievements</div>
+                <div id="stat-achievements" class="stat-value">0</div>
               </div>
-              <div class="stat">
-                <span class="label">Achievements</span>
-                <span id="homeAchievements" class="value">0</span>
+              <div class="stat-card">
+                <div class="stat-label">Best Streak</div>
+                <div id="stat-streak" class="stat-value">0</div>
               </div>
             </div>
-            <div class="daily" id="dailyRewardPanel">
-              <div>
-                <div class="section-title">Daily Reward</div>
-                <div id="dailyText" class="section-sub">Rift cache ready. Claim your rewards.</div>
+            <div class="daily-reward" id="daily-reward">
+              <div class="daily-header">
+                <div class="daily-title">Daily Reward</div>
+                <div id="daily-status" class="daily-status">Available</div>
               </div>
-              <button id="claimReward" class="btn small">Claim</button>
+              <div class="daily-body">
+                <div class="daily-reward-item" id="daily-reward-item">+120 XP · 1x Time Boost · Bonus Mission</div>
+                <button id="btn-claim-reward" class="primary small">Claim</button>
+              </div>
             </div>
-            <div class="home-microcopy" id="homeMicro">Neural oscillation stable.</div>
           </div>
         </div>
       </section>
 
-      <section id="missions" class="screen" aria-labelledby="missionsTitle">
-        <header class="section-header">
-          <div>
-            <h2 id="missionsTitle" class="section-title">Mission Select</h2>
-            <p class="section-sub">Boss nodes appear every 4 missions. Clear them to open the next tier.</p>
-          </div>
-          <div class="section-actions">
-            <button id="backHome" class="btn ghost">Back</button>
-          </div>
-        </header>
-        <div id="missionGrid" class="mission-grid"></div>
+      <section id="screen-missions" class="screen">
+        <div class="screen-header">
+          <h2>Mission Matrix</h2>
+          <p>Select a mission. Boss missions punctuate every 4 levels with unique mechanics.</p>
+        </div>
+        <div id="mission-grid" class="mission-grid"></div>
       </section>
 
-      <section id="game" class="screen" aria-labelledby="gameTitle">
-        <header class="hud">
-          <div class="hud-block">
-            <span class="label">Mission</span>
-            <span id="hudMission" class="value">1</span>
-            <span id="hudObjective" class="sub">Solve 10 in 45s</span>
+      <section id="screen-game" class="screen">
+        <div class="hud">
+          <div class="hud-row">
+            <div class="hud-card">
+              <div class="hud-label">Mission</div>
+              <div id="hud-mission" class="hud-value">-</div>
+            </div>
+            <div class="hud-card">
+              <div class="hud-label">Objective</div>
+              <div id="hud-objective" class="hud-value">-</div>
+            </div>
+            <div class="hud-card">
+              <div class="hud-label">XP</div>
+              <div id="hud-xp" class="hud-value">0</div>
+            </div>
+            <div class="hud-card">
+              <div class="hud-label">Score</div>
+              <div id="hud-score" class="hud-value">0</div>
+            </div>
+            <div class="hud-card">
+              <div class="hud-label">Time</div>
+              <div id="hud-time" class="hud-value">0</div>
+            </div>
+            <div class="hud-card">
+              <div class="hud-label">Streak</div>
+              <div id="hud-streak" class="hud-value">0</div>
+            </div>
+            <div class="hud-card">
+              <div class="hud-label">Combo</div>
+              <div id="hud-combo" class="hud-value">0</div>
+            </div>
+            <div class="hud-card">
+              <div class="hud-label">Level</div>
+              <div id="hud-level" class="hud-value">1</div>
+            </div>
           </div>
-          <div class="hud-block">
-            <span class="label">XP</span>
-            <span id="hudXp" class="value">0</span>
+          <div class="hud-row">
+            <div class="hud-card wide">
+              <div class="hud-label">Active Event</div>
+              <div id="hud-event" class="hud-value">None</div>
+            </div>
+            <button id="btn-risk" class="danger small">Risk Mode</button>
           </div>
-          <div class="hud-block">
-            <span class="label">Score</span>
-            <span id="hudScore" class="value">0</span>
-          </div>
-          <div class="hud-block">
-            <span class="label">Time</span>
-            <span id="hudTime" class="value">00:00</span>
-          </div>
-          <div class="hud-block">
-            <span class="label">Streak</span>
-            <span id="hudStreak" class="value">0</span>
-          </div>
-          <div class="hud-block">
-            <span class="label">Combo</span>
-            <span id="hudCombo" class="value">x1</span>
-          </div>
-          <div class="hud-block">
-            <span class="label">Level</span>
-            <span id="hudLevel" class="value">1</span>
-          </div>
-          <div class="hud-block">
-            <span class="label">Event</span>
-            <span id="hudEvent" class="sub">None</span>
-          </div>
-        </header>
+        </div>
 
         <div class="game-layout">
+          <div class="center-panel">
+            <div id="question-type" class="question-type">Arithmetic Burst</div>
+            <div id="question" class="question">-</div>
+            <div id="choices" class="choices"></div>
+            <div id="input-wrap" class="input-wrap hidden">
+              <input id="answer-input" type="text" inputmode="numeric" autocomplete="off" placeholder="Enter answer" />
+              <button id="btn-submit" class="primary">Submit</button>
+            </div>
+            <div id="feedback" class="feedback">Ready</div>
+          </div>
+
           <aside class="side-panel">
             <div class="panel-block">
               <div class="panel-title">Objectives</div>
-              <ul class="panel-list" id="objectiveList" aria-live="polite"></ul>
+              <ul id="objective-list" class="panel-list"></ul>
             </div>
             <div class="panel-block">
               <div class="panel-title">Power-Ups</div>
-              <div class="power-grid" id="powerGrid"></div>
+              <div id="powerups" class="powerups"></div>
             </div>
             <div class="panel-block">
-              <div class="panel-title">Run Achievements</div>
-              <ul class="panel-list" id="runAchievements"></ul>
+              <div class="panel-title">Unlocked</div>
+              <div id="achievement-feed" class="achievement-feed"></div>
             </div>
           </aside>
+        </div>
 
-          <section class="game-core">
-            <div class="core-top">
-              <span class="badge" id="missionType">Speed Arithmetic</span>
-              <span class="badge alt" id="runStatus">Neural link active</span>
-              <button id="riskToggle" class="btn ghost small">Risk Mode: Off</button>
-            </div>
-            <div class="question" id="questionText">Initializing...</div>
-            <div id="questionSub" class="question-sub" aria-live="polite"></div>
-            <div class="answer-zone">
-              <div id="choiceRow" class="choice-row hidden" role="group" aria-label="Answer choices"></div>
-              <div id="inputRow" class="input-row">
-                <input
-                  id="answerInput"
-                  type="text"
-                  inputmode="numeric"
-                  autocomplete="off"
-                  placeholder="Enter answer"
-                  aria-label="Answer input"
-                />
-                <button id="submitAnswer" class="btn primary">Submit</button>
-              </div>
-              <div id="keypad" class="keypad" aria-hidden="true"></div>
-            </div>
-            <div class="core-bottom">
-              <div class="progress">
-                <div id="progressFill" class="progress-fill"></div>
-              </div>
-              <div id="feedback" class="feedback" aria-live="polite">Awaiting input...</div>
-            </div>
-          </section>
+        <div class="bottom-bar">
+          <div class="progress-wrap">
+            <div id="progress-bar" class="progress-bar"></div>
+          </div>
+          <div id="status" class="status">Syncing with mission core...</div>
         </div>
       </section>
 
-      <section id="results" class="screen" aria-labelledby="resultsTitle">
-        <header class="section-header">
-          <div>
-            <h2 id="resultsTitle" class="section-title">Mission Report</h2>
-            <p id="resultsSubtitle" class="section-sub">Rift stabilized. Mission success.</p>
+      <section id="screen-result" class="screen">
+        <div class="result-card">
+          <h2 id="result-title">Mission Complete</h2>
+          <div class="result-grid">
+            <div class="result-item">
+              <div class="result-label">XP Gained</div>
+              <div id="result-xp" class="result-value">0</div>
+            </div>
+            <div class="result-item">
+              <div class="result-label">Accuracy</div>
+              <div id="result-accuracy" class="result-value">0%</div>
+            </div>
+            <div class="result-item">
+              <div class="result-label">Peak Streak</div>
+              <div id="result-streak" class="result-value">0</div>
+            </div>
+            <div class="result-item">
+              <div class="result-label">Peak Combo</div>
+              <div id="result-combo" class="result-value">0</div>
+            </div>
+            <div class="result-item">
+              <div class="result-label">Rewards</div>
+              <div id="result-rewards" class="result-value">-</div>
+            </div>
           </div>
-          <div class="section-actions">
-            <button id="resultsHome" class="btn ghost">Back to Home</button>
+          <div class="result-actions">
+            <button id="btn-next" class="primary">Next Mission</button>
+            <button id="btn-replay" class="secondary">Replay</button>
+            <button id="btn-home-result" class="ghost">Home</button>
           </div>
-        </header>
-        <div class="results-grid">
-          <div class="results-card">
-            <div class="panel-title">Performance</div>
-            <ul class="panel-list" id="resultsSummary"></ul>
-          </div>
-          <div class="results-card">
-            <div class="panel-title">Rewards</div>
-            <ul class="panel-list" id="resultsRewards"></ul>
-          </div>
-          <div class="results-card">
-            <div class="panel-title">Achievements</div>
-            <ul class="panel-list" id="resultsAchievements"></ul>
-          </div>
-        </div>
-        <div class="results-actions">
-          <button id="nextMission" class="btn primary">Next Mission</button>
-          <button id="replayMission" class="btn secondary">Replay Mission</button>
         </div>
       </section>
     </main>
 
-    <script src="/script.js"></script>
-  </body>
+    <div id="achievement-popup" class="achievement-popup hidden"></div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
 </html>
-<!-- update -->
