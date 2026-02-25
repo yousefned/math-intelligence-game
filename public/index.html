@@ -3,154 +3,198 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Math Intelligence Game: Neon Protocol</title>
+    <title>Math Intelligence Game: Neon Rift</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;600;700&family=Space+Grotesk:wght@400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700&family=Sora:wght@300;400;600&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/style.css" />
   </head>
-  <body class="theme-cyan">
-    <div class="backdrop" aria-hidden="true">
-      <div class="grid"></div>
-      <div class="waves"></div>
-      <div class="particles"></div>
-      <div class="scanlines"></div>
+  <body>
+    <div class="bg" aria-hidden="true">
+      <div class="bg-grid"></div>
+      <div class="bg-waves"></div>
+      <div class="bg-particles"></div>
+      <div class="bg-glow"></div>
     </div>
 
     <main id="app" class="app" aria-live="polite">
-      <section id="intro" class="screen intro active">
-        <div class="intro-panel">
-          <div class="intro-badge">Neon Protocol v2.4</div>
-          <h1 class="intro-title">Math Intelligence Game</h1>
-          <p class="intro-subtitle">
-            Jack into the grid. Complete missions, hack the sequences, and prove your logic under pressure.
-          </p>
-          <div class="intro-matrix">
-            <div class="matrix-line"></div>
-            <div class="matrix-line"></div>
-            <div class="matrix-line"></div>
-          </div>
-          <button id="startMissionBtn" class="btn primary large">Initialize Mission</button>
-          <p class="intro-note">Tip: Power-ups are limited per mission. Use them wisely.</p>
-        </div>
-      </section>
-
-      <section id="game" class="screen game">
-        <header class="hud">
-          <div class="hud-group">
-            <div class="hud-label">Mission</div>
-            <div id="hudMission" class="hud-value">Boot Sequence</div>
-            <div id="hudObjective" class="hud-sub">Solve 5 equations in 30s</div>
-          </div>
-          <div class="hud-group center">
-            <div class="hud-stat">
-              <span class="hud-label">Score</span>
-              <span id="hudScore" class="hud-value">0</span>
-            </div>
-            <div class="hud-stat">
-              <span class="hud-label">Time</span>
-              <span id="hudTime" class="hud-value">30</span>
-            </div>
-            <div class="hud-stat">
-              <span class="hud-label">Streak</span>
-              <span id="hudStreak" class="hud-value">0</span>
-            </div>
-          </div>
-          <div class="hud-group right">
+      <section id="home" class="screen active">
+        <div class="home-card">
+          <div class="home-top">
+            <span class="badge">AI RIFT CONSOLE</span>
             <button id="soundToggle" class="toggle" aria-pressed="true">
               <span>Sound</span>
               <span class="toggle-indicator"></span>
             </button>
-            <div class="segmented" role="group" aria-label="Difficulty">
-              <button class="segment active" data-difficulty="easy">Easy</button>
-              <button class="segment" data-difficulty="medium">Medium</button>
-              <button class="segment" data-difficulty="hard">Hard</button>
+          </div>
+          <h1 class="home-title">Math Intelligence Game</h1>
+          <p class="home-subtitle">
+            Enter the Neon Rift. Hack math systems, solve logic breaches, and climb global missions powered by AI.
+          </p>
+
+          <div class="home-stats">
+            <div class="stat">
+              <span class="label">Level</span>
+              <span id="homeLevel" class="value">1</span>
             </div>
-            <button id="themeToggle" class="toggle" aria-pressed="false">
-              <span>Theme</span>
-              <span class="toggle-indicator"></span>
-            </button>
+            <div class="stat">
+              <span class="label">XP</span>
+              <span id="homeXp" class="value">0</span>
+            </div>
+            <div class="stat">
+              <span class="label">Achievements</span>
+              <span id="homeAchievements" class="value">0</span>
+            </div>
+          </div>
+
+          <div class="home-actions">
+            <button id="startRun" class="btn primary">Start Mission Run</button>
+            <button id="openMissions" class="btn ghost">Mission Select</button>
+          </div>
+
+          <div class="daily-reward" id="dailyRewardPanel">
+            <div>
+              <div class="daily-title">Daily Reward</div>
+              <div id="dailyText" class="daily-text">Log in to claim rewards.</div>
+            </div>
+            <button id="claimReward" class="btn small">Claim</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="missions" class="screen">
+        <div class="missions-card">
+          <div class="missions-header">
+            <div>
+              <div class="section-title">Mission Select</div>
+              <div class="section-sub">Boss encounters appear every 4 missions.</div>
+            </div>
+            <button id="backHome" class="btn ghost">Back</button>
+          </div>
+          <div id="missionGrid" class="mission-grid"></div>
+        </div>
+      </section>
+
+      <section id="game" class="screen">
+        <header class="hud">
+          <div class="hud-left">
+            <div class="hud-item">
+              <span class="label">Mission</span>
+              <span id="hudMission" class="value">1</span>
+              <span id="hudObjective" class="sub">Solve 10 in 45s</span>
+            </div>
+            <div class="hud-item">
+              <span class="label">XP</span>
+              <span id="hudXp" class="value">0</span>
+            </div>
+          </div>
+          <div class="hud-center">
+            <div class="hud-item">
+              <span class="label">Score</span>
+              <span id="hudScore" class="value">0</span>
+            </div>
+            <div class="hud-item">
+              <span class="label">Time</span>
+              <span id="hudTime" class="value">0</span>
+            </div>
+            <div class="hud-item">
+              <span class="label">Streak</span>
+              <span id="hudStreak" class="value">0</span>
+            </div>
+            <div class="hud-item">
+              <span class="label">Combo</span>
+              <span id="hudCombo" class="value">x1</span>
+            </div>
+          </div>
+          <div class="hud-right">
+            <div class="hud-item">
+              <span class="label">Level</span>
+              <span id="hudLevel" class="value">1</span>
+            </div>
+            <div class="hud-item">
+              <span class="label">Event</span>
+              <span id="hudEvent" class="sub">None</span>
+            </div>
+            <button id="exitRun" class="btn ghost">Exit</button>
           </div>
         </header>
 
-        <section class="game-layout">
-          <div class="main-panel">
-            <div class="panel-head">
-              <div class="panel-title">Neural Challenge</div>
-              <div id="eventBanner" class="event-banner">System Ready</div>
+        <section class="game-body">
+          <div class="question-panel">
+            <div class="panel-header">
+              <div class="panel-title">Neon Rift Challenge</div>
+              <div id="objectiveText" class="panel-sub">Solve 10 in 45s</div>
             </div>
 
             <div id="questionCard" class="question-card">
               <div class="question-label">Encrypted Prompt</div>
-              <div id="questionText" class="question-text">Initialize to receive mission data.</div>
+              <div id="questionText" class="question-text">Initializing...</div>
+              <div id="memoryReveal" class="memory-reveal" aria-hidden="true"></div>
               <div id="choiceRow" class="choice-row" aria-hidden="true">
-                <button class="chip" data-choice="1">Left > Right</button>
+                <button class="chip" data-choice="1">Left &gt; Right</button>
                 <button class="chip" data-choice="0">Equal</button>
-                <button class="chip" data-choice="2">Right > Left</button>
+                <button class="chip" data-choice="2">Right &gt; Left</button>
               </div>
             </div>
 
-            <div class="input-row">
-              <input id="answerInput" type="text" placeholder="Enter response" autocomplete="off" />
+            <div class="answer-row">
+              <input id="answerInput" type="text" placeholder="Enter answer" autocomplete="off" />
               <button id="submitAnswer" class="btn primary">Transmit</button>
             </div>
 
             <div class="progress-row">
-              <div class="progress-label">Mission Progress</div>
+              <div class="progress-header">
+                <span class="label">Mission Progress</span>
+                <span id="progressText" class="sub">0 / 10</span>
+              </div>
               <div class="progress-track">
                 <div id="missionProgress" class="progress-fill"></div>
               </div>
-              <div id="progressText" class="progress-text">0 / 5 solved</div>
             </div>
+
+            <div id="feedback" class="feedback">Ready</div>
           </div>
 
           <aside class="side-panel">
-            <div class="side-section">
+            <div class="side-block">
               <div class="side-title">Objectives</div>
-              <ul id="missionList" class="side-list">
-                <li>Complete the mission target.</li>
-                <li>Maintain a streak for multipliers.</li>
-                <li>Use power-ups strategically.</li>
-              </ul>
+              <ul id="objectiveList" class="side-list"></ul>
             </div>
 
-            <div class="side-section">
+            <div class="side-block">
               <div class="side-title">Power-Ups</div>
               <div class="power-grid">
-                <button id="powerTime" class="power" data-power="time">
-                  +10s
-                  <span class="power-meta" id="powerTimeCount">x1</span>
-                </button>
-                <button id="powerDouble" class="power" data-power="double">
-                  Double Score
-                  <span class="power-meta" id="powerDoubleCount">x1</span>
-                </button>
-                <button id="powerSkip" class="power" data-power="skip">
-                  Skip
-                  <span class="power-meta" id="powerSkipCount">x1</span>
-                </button>
+                <button id="powerTime" class="power" data-power="time">+10s <span id="powerTimeCount" class="power-meta">x1</span></button>
+                <button id="powerDouble" class="power" data-power="double">Double <span id="powerDoubleCount" class="power-meta">x1</span></button>
+                <button id="powerSkip" class="power" data-power="skip">Skip <span id="powerSkipCount" class="power-meta">x1</span></button>
+                <button id="powerFreeze" class="power" data-power="freeze">Freeze <span id="powerFreezeCount" class="power-meta">x1</span></button>
               </div>
             </div>
 
-            <div class="side-section">
-              <div class="side-title">Mission Intel</div>
-              <p id="missionTip" class="side-text">Complete all objectives before the timer hits zero.</p>
+            <div class="side-block">
+              <div class="side-title">Achievements</div>
+              <div id="achievementList" class="achievement-list"></div>
             </div>
           </aside>
         </section>
       </section>
 
-      <section id="missionComplete" class="screen modal" aria-hidden="true">
-        <div class="modal-card">
-          <div class="modal-title">Mission Complete</div>
-          <p id="missionSummary" class="modal-text"></p>
-          <button id="nextMission" class="btn primary">Deploy Next Mission</button>
+      <section id="result" class="screen">
+        <div class="result-card">
+          <div id="resultTitle" class="result-title">Mission Complete</div>
+          <p id="resultSummary" class="result-text"></p>
+          <div class="result-actions">
+            <button id="nextMission" class="btn primary">Next Mission</button>
+            <button id="backToHome" class="btn ghost">Home</button>
+          </div>
         </div>
       </section>
     </main>
+
+    <footer class="footer">Developed by YOUCEF</footer>
 
     <div id="flash" class="flash" aria-hidden="true"></div>
 
