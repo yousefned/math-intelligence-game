@@ -8,35 +8,44 @@
 </head>
 <body>
   <div id="app" class="app">
-    <div class="ambient-grid"></div>
-    <div class="scanlines"></div>
-    <div id="rift-overlay" class="rift-overlay hidden"></div>
-    <div id="flash" class="flash hidden"></div>
+    <div class="bg-orbit"></div>
+    <div class="bg-grid"></div>
+    <div class="bg-scan"></div>
+    <div id="rift-overlay" class="rift-overlay"></div>
+    <div id="event-overlay" class="event-overlay"></div>
+    <div id="flash" class="flash"></div>
+
+    <div class="particle-field" aria-hidden="true">
+      <span></span><span></span><span></span><span></span><span></span>
+      <span></span><span></span><span></span><span></span><span></span>
+      <span></span><span></span><span></span><span></span><span></span>
+      <span></span><span></span><span></span><span></span><span></span>
+    </div>
 
     <header class="topbar">
       <div class="brand">
         <div class="brand-mark"></div>
-        <div>
+        <div class="brand-text">
           <div class="brand-title">NEON RIFT</div>
           <div class="brand-sub">Cognitive Training Console</div>
         </div>
       </div>
       <div class="topbar-actions">
-        <button id="btn-home" class="ghost">Home</button>
-        <button id="btn-missions" class="ghost">Missions</button>
+        <button id="btn-home" class="btn ghost">Home</button>
+        <button id="btn-missions" class="btn ghost">Missions</button>
       </div>
     </header>
 
     <main class="stage">
       <section id="screen-home" class="screen active">
         <div class="hero">
-          <div class="hero-text">
-            <div class="tag">ELITE NEURAL PROTOCOL</div>
+          <div class="hero-copy">
+            <div class="pill">ELITE NEURAL PROTOCOL</div>
             <h1>Math Intelligence Game: Neon Rift</h1>
-            <p>Train speed, memory, logic, and focus through a living AI mainframe.</p>
+            <p>Train speed, memory, logic, and focus through a living AI mainframe designed for elite cognitive enhancement.</p>
             <div class="hero-actions">
-              <button id="btn-start" class="primary">Start Mission Run</button>
-              <button id="btn-mission-select" class="secondary">Mission Select</button>
+              <button id="btn-start" class="btn primary">Start Mission Run</button>
+              <button id="btn-mission-select" class="btn secondary">Mission Select</button>
             </div>
           </div>
           <div class="hero-panel">
@@ -46,7 +55,7 @@
                 <div id="stat-level" class="stat-value">1</div>
               </div>
               <div class="stat-card">
-                <div class="stat-label">XP</div>
+                <div class="stat-label">Total XP</div>
                 <div id="stat-xp" class="stat-value">0</div>
               </div>
               <div class="stat-card">
@@ -58,24 +67,46 @@
                 <div id="stat-streak" class="stat-value">0</div>
               </div>
             </div>
-            <div class="daily-reward" id="daily-reward">
+            <div class="daily-panel" id="daily-panel">
               <div class="daily-header">
                 <div class="daily-title">Daily Reward</div>
                 <div id="daily-status" class="daily-status">Available</div>
               </div>
               <div class="daily-body">
-                <div class="daily-reward-item" id="daily-reward-item">+120 XP · 1x Time Boost · Bonus Mission</div>
-                <button id="btn-claim-reward" class="primary small">Claim</button>
+                <div id="daily-reward-item" class="daily-reward-item">+120 XP · 1x Time Boost · Bonus Mission</div>
+                <button id="btn-claim-reward" class="btn primary small">Claim</button>
               </div>
             </div>
+          </div>
+        </div>
+
+        <div class="home-modules">
+          <div class="module-card">
+            <div class="module-title">Neural Insights</div>
+            <div id="module-insight" class="module-body">Next mission targets speed arithmetic and memory echoes.</div>
+          </div>
+          <div class="module-card">
+            <div class="module-title">Rift Events</div>
+            <div class="module-body">Randomized AI anomalies amplify performance windows.</div>
+          </div>
+          <div class="module-card">
+            <div class="module-title">Risk Mode</div>
+            <div class="module-body">Stake XP for high-stakes intelligence spikes.</div>
           </div>
         </div>
       </section>
 
       <section id="screen-missions" class="screen">
         <div class="screen-header">
-          <h2>Mission Matrix</h2>
-          <p>Select a mission. Boss missions punctuate every 4 levels with unique mechanics.</p>
+          <div>
+            <h2>Mission Matrix</h2>
+            <p>Select a mission. Boss missions punctuate every 4 levels with unique mechanics.</p>
+          </div>
+          <div class="legend">
+            <span class="legend-chip">Standard</span>
+            <span class="legend-chip boss">Boss</span>
+            <span class="legend-chip locked">Locked</span>
+          </div>
         </div>
         <div id="mission-grid" class="mission-grid"></div>
       </section>
@@ -121,7 +152,7 @@
               <div class="hud-label">Active Event</div>
               <div id="hud-event" class="hud-value">None</div>
             </div>
-            <button id="btn-risk" class="danger small">Risk Mode</button>
+            <button id="btn-risk" class="btn danger small">Risk Mode</button>
           </div>
         </div>
 
@@ -132,7 +163,7 @@
             <div id="choices" class="choices"></div>
             <div id="input-wrap" class="input-wrap hidden">
               <input id="answer-input" type="text" inputmode="numeric" autocomplete="off" placeholder="Enter answer" />
-              <button id="btn-submit" class="primary">Submit</button>
+              <button id="btn-submit" class="btn primary">Submit</button>
             </div>
             <div id="feedback" class="feedback">Ready</div>
           </div>
@@ -187,15 +218,16 @@
             </div>
           </div>
           <div class="result-actions">
-            <button id="btn-next" class="primary">Next Mission</button>
-            <button id="btn-replay" class="secondary">Replay</button>
-            <button id="btn-home-result" class="ghost">Home</button>
+            <button id="btn-next" class="btn primary">Next Mission</button>
+            <button id="btn-replay" class="btn secondary">Replay</button>
+            <button id="btn-home-result" class="btn ghost">Home</button>
           </div>
         </div>
       </section>
     </main>
 
-    <div id="achievement-popup" class="achievement-popup hidden"></div>
+    <div id="achievement-popup" class="achievement-popup"></div>
+    <div id="toast" class="toast"></div>
   </div>
 
   <script src="script.js"></script>
