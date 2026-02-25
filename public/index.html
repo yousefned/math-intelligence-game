@@ -25,6 +25,8 @@
     <div id="rift-overlay" class="rift-overlay" aria-hidden="true"></div>
     <div id="event-overlay" class="event-overlay" aria-hidden="true"></div>
     <div id="tint-overlay" class="tint-overlay" aria-hidden="true"></div>
+    <div id="flash-overlay" class="flash-overlay" aria-hidden="true"></div>
+    <div id="particle-layer" class="particle-layer" aria-hidden="true"></div>
     <div id="boss-overlay" class="boss-overlay" aria-hidden="true">
       <div class="boss-intro">
         <div class="boss-ring"></div>
@@ -154,11 +156,11 @@
               <div class="hud-label">Time</div>
               <div id="hud-time" class="hud-value">0.0</div>
             </div>
-            <div class="hud-mini">
-              <div class="hud-label">Streak</div>
-              <div id="hud-streak" class="hud-value">0</div>
-            </div>
-            <div class="hud-mini">
+          <div class="hud-mini">
+            <div class="hud-label">Streak</div>
+            <div id="hud-streak" class="hud-value">0</div>
+          </div>
+          <div class="hud-mini">
               <div class="hud-label">Combo</div>
               <div id="hud-combo" class="hud-value">x1</div>
             </div>
@@ -166,12 +168,13 @@
               <div class="hud-label">Level</div>
               <div id="hud-level" class="hud-value">1</div>
             </div>
-            <div class="hud-mini">
-              <div class="hud-label">Event</div>
-              <div id="hud-event" class="hud-value">Stable</div>
-            </div>
+          <div class="hud-mini">
+            <div class="hud-label">Event</div>
+            <div id="hud-event" class="hud-value">Stable</div>
           </div>
         </div>
+        <div id="streak-indicator" class="streak-indicator" aria-live="polite"></div>
+      </div>
 
         <div class="game-panel">
           <div class="question-card">
@@ -297,8 +300,8 @@
             </select>
           </label>
           <label class="setting">
-            <span>Volume</span>
-            <input id="range-volume" type="range" min="0" max="1" step="0.05" value="0.5" />
+            <span>Volume <em id="volume-value">50%</em></span>
+            <input id="range-volume" type="range" min="0" max="100" step="1" value="50" />
           </label>
         </div>
         <div class="overlay-actions">

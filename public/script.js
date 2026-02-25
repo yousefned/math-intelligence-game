@@ -70,7 +70,9 @@
     riftOverlay: document.getElementById('rift-overlay'),
     eventOverlay: document.getElementById('event-overlay'),
     tintOverlay: document.getElementById('tint-overlay'),
+    flashOverlay: document.getElementById('flash-overlay'),
     bossOverlay: document.getElementById('boss-overlay'),
+    particleLayer: document.getElementById('particle-layer'),
     pauseMenu: document.getElementById('pause-menu'),
     settingsPanel: document.getElementById('settings-panel'),
     tutorial: document.getElementById('tutorial'),
@@ -80,8 +82,10 @@
     selectTheme: document.getElementById('select-theme'),
     selectFont: document.getElementById('select-font'),
     rangeVolume: document.getElementById('range-volume'),
+    volumeValue: document.getElementById('volume-value'),
     questionCard: document.querySelector('.question-card'),
-    riskPanel: document.getElementById('risk-panel')
+    riskPanel: document.getElementById('risk-panel'),
+    streakIndicator: document.getElementById('streak-indicator')
   };
 
   const Utils = {
@@ -218,13 +222,18 @@
     init() {
       const saved = Storage.loadSettings();
       if (saved) {
-        this.settings = { ...this.settings, ...saved };
+        const normalized = { ...saved };
+        if (typeof normalized.volume === 'number' && normalized.volume > 1) {
+          normalized.volume = Utils.clamp(normalized.volume / 100, 0, 1);
+        }
+        this.settings = { ...this.settings, ...normalized };
       }
       Dom.toggleMotion.checked = this.settings.reduceMotion;
       Dom.toggleSound.checked = this.settings.sound;
       Dom.selectTheme.value = this.settings.theme;
       Dom.selectFont.value = String(this.settings.fontScale);
-      Dom.rangeVolume.value = String(this.settings.volume);
+      Dom.rangeVolume.value = String(Math.round(this.settings.volume * 100));
+      Dom.volumeValue.textContent = `${Math.round(this.settings.volume * 100)}%`;
       this.apply();
     },
     apply() {
@@ -248,69 +257,94 @@
       if (this.context) return;
       this.context = new (window.AudioContext || window.webkitAudioContext)();
       this.master = this.context.createGain();
-      this.master.gain.value = SettingsManager.settings.volume;
+      this.master.gain.value = SettingsManager.settings.sound ? SettingsManager.settings.volume : 0;
       this.master.connect(this.context.destination);
       this.unlocked = true;
-      this.createAmbient();
+      this.playAmbientLoop();
+    },
+    resume() {
+      if (this.context && this.context.state === 'suspended') {
+        this.context.resume();
+      }
     },
     setVolume(value) {
-      if (this.master) this.master.gain.value = value;
+      if (!this.master) return;
+      this.master.gain.value = SettingsManager.settings.sound ? value : 0;
+      if (this.ambient) {
+        const ambientBase = SettingsManager.settings.sound ? Math.max(0.005, value * 0.08) : 0;
+        this.ambient.gain.gain.setTargetAtTime(ambientBase, this.context.currentTime, 0.05);
+      }
     },
-    createTone(freq, duration, type = 'sine', gain = 0.3) {
+    createTone(freq, duration, type = 'sine', gain = 0.3, glide = 0) {
       if (!SettingsManager.settings.sound || !this.context) return;
       const osc = this.context.createOscillator();
       const g = this.context.createGain();
+      const now = this.context.currentTime;
       osc.type = type;
-      osc.frequency.value = freq;
-      g.gain.value = gain;
+      osc.frequency.setValueAtTime(freq, now);
+      if (glide) osc.frequency.exponentialRampToValueAtTime(Math.max(20, freq + glide), now + duration);
+      g.gain.setValueAtTime(gain, now);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + duration);
       osc.connect(g);
       g.connect(this.master);
-      osc.start();
-      g.gain.exponentialRampToValueAtTime(0.0001, this.context.currentTime + duration);
-      osc.stop(this.context.currentTime + duration);
+      osc.start(now);
+      osc.stop(now + duration);
     },
     play(name) {
-      if (!SettingsManager.settings.sound) return;
+      if (!this.context) this.init();
+      if (!SettingsManager.settings.sound || !this.context) return;
+      this.resume();
       switch (name) {
         case 'correct':
-          this.createTone(720, 0.2, 'triangle', 0.25);
+          this.createTone(760, 0.18, 'triangle', 0.22, 80);
           break;
         case 'wrong':
-          this.createTone(160, 0.25, 'sawtooth', 0.3);
+          this.createTone(180, 0.24, 'sawtooth', 0.28, -40);
           break;
         case 'level':
-          this.createTone(840, 0.3, 'square', 0.3);
+          this.createTone(880, 0.28, 'square', 0.28, 120);
           break;
         case 'power':
-          this.createTone(520, 0.2, 'triangle', 0.2);
+          this.createTone(540, 0.2, 'triangle', 0.2, 60);
           break;
         case 'boss':
-          this.createTone(120, 0.4, 'sawtooth', 0.25);
+          this.createTone(130, 0.45, 'sawtooth', 0.3, -30);
           break;
         case 'click':
-          this.createTone(420, 0.08, 'square', 0.15);
+          this.createTone(420, 0.07, 'square', 0.15);
           break;
-        case 'ambience':
+        case 'start':
+          this.createTone(520, 0.16, 'sine', 0.18, 60);
           break;
         default:
-          this.createTone(360, 0.1, 'sine', 0.15);
+          this.createTone(360, 0.1, 'sine', 0.12);
       }
     },
-    createAmbient() {
-      if (!this.context || this.ambient) return;
-      const osc = this.context.createOscillator();
-      const gain = this.context.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = 55;
-      gain.gain.value = 0.02;
-      osc.connect(gain);
-      gain.connect(this.master);
-      osc.start();
-      this.ambient = { osc, gain };
+    playClick() { this.play('click'); },
+    playCorrect() { this.play('correct'); },
+    playWrong() { this.play('wrong'); },
+    playLevelUp() { this.play('level'); },
+    playPowerUp() { this.play('power'); },
+    playBossWarning() { this.play('boss'); },
+    playAmbientLoop() {
+      if (!this.context) return;
+      if (!SettingsManager.settings.sound) return;
+      if (!this.ambient) {
+        const osc = this.context.createOscillator();
+        const gain = this.context.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = 55;
+        gain.gain.value = 0;
+        osc.connect(gain);
+        gain.connect(this.master);
+        osc.start();
+        this.ambient = { osc, gain };
+      }
+      this.setVolume(SettingsManager.settings.volume);
     },
     stopAmbient() {
-      if (this.ambient) {
-        this.ambient.gain.gain.value = 0;
+      if (this.ambient && this.context) {
+        this.ambient.gain.gain.setTargetAtTime(0, this.context.currentTime, 0.08);
       }
     }
   };
@@ -356,6 +390,7 @@
 
   const ParticleEngine = {
     spawn(x, y, count = 12, color = 'rgba(46, 247, 255, 0.7)') {
+      if (SettingsManager.settings.reduceMotion) return;
       const frag = document.createDocumentFragment();
       for (let i = 0; i < count; i += 1) {
         const p = document.createElement('span');
@@ -370,9 +405,10 @@
         frag.appendChild(p);
         TimerManager.setTimeout(() => p.remove(), 1200);
       }
-      Dom.app.appendChild(frag);
+      Dom.particleLayer.appendChild(frag);
     },
     burstFromElement(el, color) {
+      if (!el) return;
       const rect = el.getBoundingClientRect();
       const x = rect.left + rect.width / 2;
       const y = rect.top + rect.height / 2;
@@ -422,7 +458,9 @@
       Dom.riftOverlay.style.opacity = 0;
       Dom.eventOverlay.style.opacity = 0;
       Dom.tintOverlay.style.opacity = 0;
+      Dom.flashOverlay.classList.remove('good', 'bad');
       Dom.bossOverlay.classList.remove('show');
+      document.body.classList.remove('risk-mode');
     }
   };
 
@@ -473,7 +511,7 @@
         `;
         card.addEventListener('click', () => {
           if (mission.id <= GameState.player.unlockedMissions) {
-            AudioManager.play('click');
+            AudioManager.playClick();
             startMission(mission);
           }
         });
@@ -635,7 +673,8 @@
       Dom.tintOverlay.style.background = 'rgba(46,247,255,0.2)';
       Dom.tintOverlay.style.opacity = 1;
       TimerManager.setTimeout(() => { Dom.tintOverlay.style.opacity = 0; }, 400);
-      AudioManager.play('power');
+      AudioManager.playPowerUp();
+      ParticleEngine.burstFromElement(Dom.powerups.querySelector(`[data-key="${key}"]`), 'rgba(46, 247, 255, 0.8)');
       this.render();
       updateStatus(`${def.label} activated`);
       if (key === 'skip') presentQuestion(GameState.run);
@@ -666,7 +705,7 @@
       Dom.achievementPopup.classList.add('show');
       TimerManager.setTimeout(() => Dom.achievementPopup.classList.remove('show'), 1800);
       GameState.save();
-      AudioManager.play('level');
+      AudioManager.playLevelUp();
       updateHomeStats();
     },
     evaluate(run) {
@@ -727,6 +766,21 @@
     Dom.xpFloater.classList.add('show');
   }
 
+  function triggerFlash(type) {
+    if (SettingsManager.settings.reduceMotion) return;
+    Dom.flashOverlay.classList.remove('good', 'bad');
+    void Dom.flashOverlay.offsetWidth;
+    Dom.flashOverlay.classList.add(type);
+    TimerManager.setTimeout(() => Dom.flashOverlay.classList.remove(type), 420);
+  }
+
+  function updateStreakIndicator(run) {
+    if (!Dom.streakIndicator) return;
+    const streakLevel = Utils.clamp(run.streak / Math.max(6, run.targetStreak), 0, 1);
+    Dom.streakIndicator.classList.toggle('hot', run.streak >= 6);
+    Dom.streakIndicator.style.setProperty('--streak-width', `${Math.round(streakLevel * 100)}%`);
+  }
+
   function updateHomeStats() {
     UIRenderer.update('statLevel', GameState.player.level);
     UIRenderer.update('statXp', GameState.player.totalXp);
@@ -757,6 +811,9 @@
     UIRenderer.update('hudStreak', run.streak);
     UIRenderer.update('hudCombo', `x${run.combo}`);
     UIRenderer.update('hudLevel', GameState.player.level);
+    updateStreakIndicator(run);
+    const streakWrap = Dom.hudStreak.closest('.hud-mini');
+    if (streakWrap) streakWrap.classList.toggle('hot', run.streak >= 8);
   }
 
   function setupChoices(question) {
@@ -767,7 +824,10 @@
         const btn = document.createElement('button');
         btn.className = 'choice';
         btn.textContent = choice;
-        btn.addEventListener('click', () => submitAnswer(choice));
+        btn.addEventListener('click', () => {
+          AudioManager.playClick();
+          submitAnswer(choice);
+        });
         Dom.choices.appendChild(btn);
       });
     } else {
@@ -782,7 +842,7 @@
     Dom.questionType.textContent = run.currentQuestion.type;
     Dom.question.textContent = run.currentQuestion.text;
     Dom.feedback.textContent = 'Awaiting input...';
-    Dom.questionCard.classList.remove('correct', 'wrong');
+    Dom.questionCard.classList.remove('correct', 'wrong', 'flash', 'fail');
 
     if (run.currentQuestion.delayed) {
       setupChoices({ choices: null });
@@ -849,16 +909,18 @@
       const xpGain = Math.round(baseXp * riskMultiplier * doubleXp * run.xpBoost);
       run.xpEarned += xpGain;
       run.score += Math.round(10 * run.combo);
-      Dom.feedback.textContent = 'Perfect. Momentum up.';
-      Dom.questionCard.classList.add('correct');
+      Dom.feedback.textContent = 'Correct. Momentum up.';
+      Dom.questionCard.classList.add('correct', 'flash');
       ParticleEngine.burstFromElement(Dom.questionCard, 'rgba(61, 255, 154, 0.8)');
       showXp(xpGain);
-      AudioManager.play('correct');
+      AudioManager.playCorrect();
+      triggerFlash('good');
       Dom.hudStreak.classList.add('pulse');
       Dom.hudCombo.classList.add('pulse');
       TimerManager.setTimeout(() => {
         Dom.hudStreak.classList.remove('pulse');
         Dom.hudCombo.classList.remove('pulse');
+        Dom.questionCard.classList.remove('flash');
       }, 520);
       if (run.streak > GameState.player.bestStreak) {
         GameState.player.bestStreak = run.streak;
@@ -873,15 +935,17 @@
       run.score = Math.max(0, run.score - 10);
       if (run.risk) run.xpEarned = Math.max(0, run.xpEarned - 15);
       Dom.feedback.textContent = `Incorrect. Answer was ${run.currentQuestion.answer}.`;
-      Dom.questionCard.classList.add('wrong');
+      Dom.questionCard.classList.add('wrong', 'fail');
       Dom.questionCard.classList.add('glitch');
       ParticleEngine.burstFromElement(Dom.questionCard, 'rgba(255, 77, 94, 0.8)');
-      AudioManager.play('wrong');
+      AudioManager.playWrong();
+      triggerFlash('bad');
       if (run.mission.boss) {
         Dom.app.classList.add('shake');
         TimerManager.setTimeout(() => Dom.app.classList.remove('shake'), 320);
       }
       TimerManager.setTimeout(() => Dom.questionCard.classList.remove('glitch'), 240);
+      TimerManager.setTimeout(() => Dom.questionCard.classList.remove('fail'), 520);
     }
 
     AchievementManager.evaluate(run);
@@ -892,6 +956,7 @@
   function startMission(mission) {
     ScreenManager.switchTo(Dom.screenGame);
     document.body.classList.toggle('boss-mode', !!mission.boss);
+    AudioManager.play('start');
     GameState.run = {
       mission,
       level: mission.difficulty,
@@ -917,11 +982,16 @@
     updateHud(GameState.run);
     EventSystem.start(GameState.run);
     if (mission.boss) {
+      const bossDuration = SettingsManager.settings.reduceMotion ? 600 : 2000;
       Dom.bossOverlay.classList.add('show');
-      AudioManager.play('boss');
-      Dom.app.classList.add('shake');
-      TimerManager.setTimeout(() => Dom.app.classList.remove('shake'), 320);
-      TimerManager.setTimeout(() => Dom.bossOverlay.classList.remove('show'), 2000);
+      AudioManager.playBossWarning();
+      if (!SettingsManager.settings.reduceMotion) {
+        Dom.app.classList.add('shake');
+        triggerFlash('bad');
+        ParticleEngine.spawn(window.innerWidth / 2, window.innerHeight / 2, 30, 'rgba(255, 77, 94, 0.85)');
+        TimerManager.setTimeout(() => Dom.app.classList.remove('shake'), 320);
+      }
+      TimerManager.setTimeout(() => Dom.bossOverlay.classList.remove('show'), bossDuration);
     }
     presentQuestion(GameState.run);
     GameLoop.start();
@@ -934,6 +1004,7 @@
     EventSystem.stop();
     Dom.riskPanel.classList.remove('active');
     document.body.classList.remove('boss-mode');
+    document.body.classList.remove('risk-mode');
     ScreenManager.switchTo(Dom.screenResult);
 
     const accuracy = run.total ? Math.round((run.correct / run.total) * 100) : 0;
@@ -953,10 +1024,22 @@
       GameState.player.xp = GameState.player.xp - xpNeeded;
       GameState.player.unlockedMissions = Math.min(GameState.player.unlockedMissions + 1, GameState.missions.length);
       leveled = true;
-      AudioManager.play('level');
+      AudioManager.playLevelUp();
     }
 
-    Dom.resultXpBar.style.width = `${Math.min(100, (GameState.player.xp / xpNeeded) * 100)}%`;
+    const targetXp = Math.min(100, (GameState.player.xp / xpNeeded) * 100);
+    if (SettingsManager.settings.reduceMotion) {
+      Dom.resultXpBar.style.width = `${targetXp}%`;
+    } else {
+      Dom.resultXpBar.style.width = '0%';
+      AnimationEngine.animate({
+        duration: 800,
+        easing: (t) => 1 - Math.pow(1 - t, 3),
+        update: (t) => {
+          Dom.resultXpBar.style.width = `${Math.round(targetXp * t)}%`;
+        }
+      });
+    }
     Dom.resultXpText.textContent = `${GameState.player.xp} / ${xpNeeded}`;
 
     AchievementManager.evaluate(run);
@@ -965,7 +1048,8 @@
     MissionManager.renderGrid();
     if (leveled) {
       showToast('Level up!');
-      ParticleEngine.spawn(window.innerWidth / 2, window.innerHeight / 2, 22, 'rgba(61, 255, 154, 0.9)');
+      ParticleEngine.burstFromElement(Dom.resultXpBar, 'rgba(61, 255, 154, 0.9)');
+      triggerFlash('good');
     }
   }
 
@@ -998,7 +1082,7 @@
     GameState.paused = !GameState.paused;
     Dom.pauseMenu.classList.toggle('show', GameState.paused);
     if (GameState.paused) {
-      AudioManager.play('click');
+      AudioManager.playClick();
     }
   }
 
@@ -1006,69 +1090,79 @@
     if (!GameState.run) return;
     GameState.run.risk = !GameState.run.risk;
     Dom.riskPanel.classList.toggle('active', GameState.run.risk);
+    document.body.classList.toggle('risk-mode', GameState.run.risk);
     Dom.btnRisk.textContent = GameState.run.risk ? 'Risk Active' : 'Activate Risk';
     showToast(GameState.run.risk ? 'Risk mode engaged' : 'Risk mode disabled');
   }
 
   function setupControls() {
     Dom.btnHome.addEventListener('click', () => {
-      AudioManager.play('click');
+      AudioManager.playClick();
       ScreenManager.switchTo(Dom.screenHome);
     });
     Dom.btnMissions.addEventListener('click', () => {
-      AudioManager.play('click');
+      AudioManager.playClick();
       ScreenManager.switchTo(Dom.screenMissions);
     });
     Dom.btnSettings.addEventListener('click', () => {
-      AudioManager.play('click');
+      AudioManager.playClick();
       Dom.settingsPanel.classList.add('show');
     });
     Dom.btnPause.addEventListener('click', togglePause);
     Dom.btnStart.addEventListener('click', () => {
-      AudioManager.play('click');
+      AudioManager.playClick();
       startMission(GameState.missions[0]);
     });
     Dom.btnMissionSelect.addEventListener('click', () => {
-      AudioManager.play('click');
+      AudioManager.playClick();
       ScreenManager.switchTo(Dom.screenMissions);
     });
     Dom.btnTutorial.addEventListener('click', () => {
-      AudioManager.play('click');
+      AudioManager.playClick();
       Dom.tutorial.classList.add('show');
     });
     Dom.btnTutorialClose.addEventListener('click', () => {
-      AudioManager.play('click');
+      AudioManager.playClick();
       Dom.tutorial.classList.remove('show');
     });
-    Dom.btnClaimReward.addEventListener('click', claimDailyReward);
-    Dom.btnRisk.addEventListener('click', toggleRisk);
-    Dom.btnSubmit.addEventListener('click', () => submitAnswer());
+    Dom.btnClaimReward.addEventListener('click', () => {
+      AudioManager.playClick();
+      claimDailyReward();
+    });
+    Dom.btnRisk.addEventListener('click', () => {
+      AudioManager.playClick();
+      toggleRisk();
+    });
+    Dom.btnSubmit.addEventListener('click', () => {
+      AudioManager.playClick();
+      submitAnswer();
+    });
     Dom.answerInput.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') submitAnswer();
     });
     Dom.btnNext.addEventListener('click', () => {
-      AudioManager.play('click');
+      AudioManager.playClick();
       const next = GameState.run ? GameState.run.mission.id + 1 : 1;
       const mission = GameState.missions.find((m) => m.id === next) || GameState.missions[0];
       startMission(mission);
     });
     Dom.btnReplay.addEventListener('click', () => {
-      AudioManager.play('click');
+      AudioManager.playClick();
       const mission = GameState.run ? GameState.run.mission : GameState.missions[0];
       startMission(mission);
     });
     Dom.btnHomeResult.addEventListener('click', () => {
-      AudioManager.play('click');
+      AudioManager.playClick();
       ScreenManager.switchTo(Dom.screenHome);
     });
     Dom.btnResume.addEventListener('click', togglePause);
     Dom.btnQuit.addEventListener('click', () => {
-      AudioManager.play('click');
+      AudioManager.playClick();
       GameState.resetRun();
       ScreenManager.switchTo(Dom.screenHome);
     });
     Dom.btnSettingsClose.addEventListener('click', () => {
-      AudioManager.play('click');
+      AudioManager.playClick();
       Dom.settingsPanel.classList.remove('show');
     });
     Dom.toggleMotion.addEventListener('change', (event) => {
@@ -1076,6 +1170,13 @@
     });
     Dom.toggleSound.addEventListener('change', (event) => {
       SettingsManager.update({ sound: event.target.checked });
+      AudioManager.init();
+      if (SettingsManager.settings.sound) {
+        AudioManager.playAmbientLoop();
+      } else {
+        AudioManager.stopAmbient();
+      }
+      AudioManager.setVolume(SettingsManager.settings.volume);
     });
     Dom.selectTheme.addEventListener('change', (event) => {
       SettingsManager.update({ theme: event.target.value });
@@ -1084,12 +1185,17 @@
       SettingsManager.update({ fontScale: Number(event.target.value) });
     });
     Dom.rangeVolume.addEventListener('input', (event) => {
-      const value = Number(event.target.value);
+      const value = Utils.clamp(Number(event.target.value) / 100, 0, 1);
       SettingsManager.update({ volume: value });
+      Dom.volumeValue.textContent = `${Math.round(value * 100)}%`;
+      AudioManager.init();
       AudioManager.setVolume(value);
     });
 
     document.addEventListener('click', () => {
+      if (!AudioManager.unlocked) AudioManager.init();
+    }, { once: true });
+    document.addEventListener('keydown', () => {
       if (!AudioManager.unlocked) AudioManager.init();
     }, { once: true });
   }
