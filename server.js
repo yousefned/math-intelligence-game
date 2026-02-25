@@ -3,12 +3,11 @@ const path = require("path");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const publicDir = path.join(__dirname, "public");
 
-app.use(express.static(publicDir));
+app.use(express.static(path.join(__dirname, "public")));
 
-app.get("/*", (req, res) => {
-  res.sendFile(path.join(publicDir, "index.html"));
+app.get("/{*splat}", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
 app.listen(PORT, () => {
