@@ -1,150 +1,322 @@
-(() => {
-  const scoreEl = document.getElementById("score");
-  const timerEl = document.getElementById("timer");
-  const levelEl = document.getElementById("level");
-  const questionTextEl = document.getElementById("question-text");
-  const answerInput = document.getElementById("answer-input");
-  const startButton = document.getElementById("start-button");
-  const submitButton = document.getElementById("submit-button");
-  const questionArea = document.getElementById("question-area");
+const scoreEl = document.getElementById("score");
+const timeEl = document.getElementById("time");
+const levelEl = document.getElementById("level");
+const streakEl = document.getElementById("streak");
+const questionEl = document.getElementById("question");
+const answerInput = document.getElementById("answer");
+const checkBtn = document.getElementById("checkBtn");
+const startBtn = document.getElementById("startBtn");
+const feedbackEl = document.getElementById("feedback");
+const soundBtn = document.getElementById("soundBtn");
+const ringProgress = document.querySelector(".ring-progress");
+const timerRing = document.querySelector(".timer-ring");
+const flashEl = document.getElementById("flash");
+const levelUpEl = document.getElementById("levelUp");
 
-  let score = 0;
-  let level = 1;
-  let secondsElapsed = 0;
-  let timerId = null;
-  let currentAnswer = null;
-  let isRunning = false;
+const TOTAL_TIME = 60;
+const RING_CIRCUMFERENCE = 326;
 
-  const feedbackEl = document.createElement("p");
-  feedbackEl.id = "feedback";
-  feedbackEl.style.marginTop = "8px";
-  feedbackEl.style.color = "#a9b4c4";
-  feedbackEl.textContent = "";
-  questionArea.appendChild(feedbackEl);
+let score = 0;
+let level = 1;
+let timeLeft = TOTAL_TIME;
+let correctAnswer = null;
+let timerId = null;
+let isRunning = false;
+let streak = 0;
+let soundEnabled = false;
 
-  const operators = ["+", "-", "*"];
+const operators = ["+", "-", "*", "/", "^"];
+const difficultyRanges = {
+  easy: 20,
+  medium: 60,
+  hard: 150,
+};
 
-  function pad(num) {
-    return num.toString().padStart(2, "0");
+const sounds = {};
+
+// Utility to ensure UI never breaks on invalid values
+function safeValue(value, fallback) {
+  return Number.isFinite(value) ? value : fallback;
+}
+
+// UI updates for score/time/level/streak
+function updatePanel() {
+  scoreEl.textContent = safeValue(score, 0);
+  levelEl.textContent = safeValue(level, 1);
+  timeEl.textContent = safeValue(timeLeft, TOTAL_TIME);
+  streakEl.textContent = safeValue(streak, 0);
+}
+
+// Score animation for correct answers
+function animateScore() {
+  scoreEl.classList.add("pop");
+  setTimeout(() => scoreEl.classList.remove("pop"), 180);
+}
+
+// Smooth question transition
+function setQuestionText(text) {
+  questionEl.classList.add("fade-out");
+  setTimeout(() => {
+    questionEl.textContent = text;
+    questionEl.classList.remove("fade-out");
+  }, 160);
+}
+
+// Flash feedback for correct/incorrect answers
+function flashScreen(type) {
+  flashEl.classList.remove("success", "error");
+  void flashEl.offsetWidth;
+  flashEl.classList.add(type);
+  setTimeout(() => {
+    flashEl.classList.remove(type);
+  }, 150);
+}
+
+// Neon level-up popup
+function showLevelUp() {
+  levelUpEl.classList.add("show");
+  setTimeout(() => levelUpEl.classList.remove("show"), 900);
+}
+
+// Circular countdown animation
+function updateRing() {
+  const ratio = Math.max(0, timeLeft) / TOTAL_TIME;
+  const offset = RING_CIRCUMFERENCE * (1 - ratio);
+  ringProgress.style.strokeDashoffset = `${offset}`;
+
+  if (timeLeft <= 10) {
+    timerRing.classList.add("danger");
+  } else {
+    timerRing.classList.remove("danger");
   }
+}
 
-  function updateTimer() {
-    const minutes = Math.floor(secondsElapsed / 60);
-    const seconds = secondsElapsed % 60;
-    timerEl.textContent = `الوقت: ${pad(minutes)}:${pad(seconds)}`;
+// Sound playback with safety guards
+function playSound(name) {
+  if (!soundEnabled || !sounds[name]) return;
+  try {
+    const sound = sounds[name];
+    sound.currentTime = 0;
+    sound.play();
+  } catch (error) {
+    console.error("Sound error:", error);
   }
+}
 
-  function updateStats() {
-    scoreEl.textContent = `النقاط: ${score}`;
-    levelEl.textContent = `المستوى: ${level}`;
+// Load lightweight embedded sounds (no external assets)
+function loadSounds() {
+  try {
+    const tone = "data:audio/wav;base64,UklGRjQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQwAAAAA/////wAAAP///wAAAAA=";
+    sounds.correct = new Audio(tone);
+    sounds.wrong = new Audio(tone);
+    sounds.level = new Audio(tone);
+    sounds.start = new Audio(tone);
+    sounds.beep = new Audio(tone);
+  } catch (error) {
+    console.error("Failed to load sounds:", error);
   }
+}
 
-  function updateLevel() {
-    const newLevel = Math.floor(score / 50) + 1;
-    if (newLevel !== level) {
-      level = newLevel;
-      feedbackEl.textContent = `تمت الترقية إلى المستوى ${level}`;
+function randomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function getDifficultyLimit() {
+  const checked = document.querySelector("input[name='difficulty']:checked");
+  const key = checked ? checked.value : "easy";
+  return difficultyRanges[key] || difficultyRanges.easy;
+}
+
+// Simple logic sequence generator
+function generateLogicPuzzle(limit) {
+  const start = randomInt(1, Math.max(3, Math.floor(limit / 4)));
+  const step = randomInt(2, 6);
+  const seq = [start, start + step, start + step * 2];
+  const answer = start + step * 3;
+  return {
+    question: `${seq[0]}، ${seq[1]}، ${seq[2]}، ؟`,
+    answer,
+  };
+}
+
+// Random question generator including new types
+function generateQuestion() {
+  const maxNumber = getDifficultyLimit() + (level - 1) * 6;
+  const operator = operators[randomInt(0, operators.length - 1)];
+
+  let left = randomInt(1, maxNumber);
+  let right = randomInt(1, maxNumber);
+  let questionText = "";
+  let answer = 0;
+
+  if (operator === "+") {
+    answer = left + right;
+    questionText = `${left} + ${right} = ؟`;
+  } else if (operator === "-") {
+    if (right > left) {
+      [left, right] = [right, left];
     }
+    answer = left - right;
+    questionText = `${left} - ${right} = ؟`;
+  } else if (operator === "*") {
+    answer = left * right;
+    questionText = `${left} × ${right} = ؟`;
+  } else if (operator === "/") {
+    right = randomInt(1, Math.max(2, Math.floor(maxNumber / 4)));
+    answer = randomInt(1, Math.max(2, Math.floor(maxNumber / 5)));
+    left = right * answer;
+    questionText = `${left} ÷ ${right} = ؟`;
+  } else if (operator === "^") {
+    left = randomInt(2, 5);
+    right = randomInt(2, 3);
+    answer = left ** right;
+    questionText = `${left} ^ ${right} = ؟`;
   }
 
-  function randomInt(min, max) {
-    return Math.floor(Math.random() * (max - min + 1)) + min;
+  if (Math.random() < 0.2) {
+    const puzzle = generateLogicPuzzle(maxNumber);
+    questionText = puzzle.question;
+    answer = puzzle.answer;
   }
 
-  function generateQuestion() {
-    const base = 5 + level * 3;
-    const max = Math.min(base * 2, 200);
-    const a = randomInt(1, max);
-    const b = randomInt(1, max);
-    const operator = operators[randomInt(0, operators.length - 1)];
+  correctAnswer = answer;
+  setQuestionText(questionText);
+}
 
-    let question = `${a} ${operator} ${b}`;
-    let answer;
-
-    if (operator === "+") answer = a + b;
-    if (operator === "-") answer = a - b;
-    if (operator === "*") answer = a * b;
-
-    currentAnswer = answer;
-    questionTextEl.textContent = `حل: ${question}`;
+// Combo bonuses for streaks
+function applyComboBonus() {
+  let bonus = 0;
+  if (streak === 3) {
+    bonus = 5;
+  } else if (streak === 5) {
+    bonus = 15;
   }
 
-  function showFeedback(message, isPositive) {
-    feedbackEl.textContent = message;
-    feedbackEl.style.color = isPositive ? "#76f7c4" : "#ff7b7b";
+  if (bonus > 0) {
+    score += bonus;
+    feedbackEl.textContent = `سلسلة رائعة! +${bonus} نقاط إضافية`;
+    animateScore();
+  }
+}
+
+function startTimer() {
+  if (timerId) {
+    clearInterval(timerId);
   }
 
-  function resetGame() {
-    score = 0;
-    level = 1;
-    secondsElapsed = 0;
-    currentAnswer = null;
-    updateStats();
-    updateTimer();
-    questionTextEl.textContent = "اضغط على زر البدء لعرض السؤال";
-    feedbackEl.textContent = "";
-    answerInput.value = "";
-  }
+  timerId = setInterval(() => {
+    timeLeft -= 1;
+    updatePanel();
+    updateRing();
 
-  function startGame() {
-    if (isRunning) return;
-    isRunning = true;
-    resetGame();
-    generateQuestion();
-
-    timerId = setInterval(() => {
-      secondsElapsed += 1;
-      updateTimer();
-    }, 1000);
-  }
-
-  function stopTimer() {
-    if (timerId) {
-      clearInterval(timerId);
-      timerId = null;
-    }
-  }
-
-  function submitAnswer() {
-    if (!isRunning) {
-      showFeedback("ابدأ اللعبة أولاً", false);
-      return;
+    if (timeLeft === 10) {
+      playSound("beep");
     }
 
-    const userAnswer = Number(answerInput.value.trim());
-    if (Number.isNaN(userAnswer)) {
-      showFeedback("أدخل رقمًا صحيحًا", false);
-      return;
+    if (timeLeft <= 0) {
+      endGame();
     }
+  }, 1000);
+}
 
-    if (userAnswer === currentAnswer) {
-      score += 10;
-      updateLevel();
-      updateStats();
-      showFeedback("إجابة صحيحة!", true);
-      generateQuestion();
-    } else {
-      score = Math.max(0, score - 5);
-      updateStats();
-      showFeedback("إجابة خاطئة، حاول مرة أخرى", false);
-    }
+function startGame() {
+  score = 0;
+  level = 1;
+  timeLeft = TOTAL_TIME;
+  streak = 0;
+  isRunning = true;
 
-    answerInput.value = "";
-    answerInput.focus();
+  feedbackEl.textContent = "انطلق!";
+  answerInput.value = "";
+  answerInput.disabled = false;
+  checkBtn.disabled = false;
+  answerInput.focus();
+
+  updatePanel();
+  updateRing();
+  generateQuestion();
+  startTimer();
+  playSound("start");
+}
+
+function endGame() {
+  isRunning = false;
+  clearInterval(timerId);
+  timerId = null;
+  timeLeft = 0;
+  updatePanel();
+  updateRing();
+  feedbackEl.textContent = `انتهى الوقت! نتيجتك النهائية: ${score}`;
+  answerInput.disabled = true;
+  checkBtn.disabled = true;
+}
+
+function handleCorrectAnswer() {
+  score += 10;
+  streak += 1;
+
+  if (score % 50 === 0) {
+    level += 1;
+    showLevelUp();
+    playSound("level");
   }
 
-  startButton.addEventListener("click", () => {
-    startGame();
-    answerInput.focus();
-  });
+  applyComboBonus();
+  feedbackEl.textContent = "إجابة صحيحة!";
+  animateScore();
+  flashScreen("success");
+  answerInput.value = "";
+  generateQuestion();
+  updatePanel();
+  playSound("correct");
+}
 
-  submitButton.addEventListener("click", submitAnswer);
+function handleWrongAnswer() {
+  streak = 0;
+  feedbackEl.textContent = "إجابة خاطئة، حاول مرة أخرى.";
+  flashScreen("error");
+  updatePanel();
+  playSound("wrong");
+}
 
-  answerInput.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      submitAnswer();
-    }
-  });
+function checkAnswer() {
+  if (!isRunning) {
+    feedbackEl.textContent = "اضغط ابدأ اللعبة أولاً.";
+    return;
+  }
 
-  window.addEventListener("beforeunload", stopTimer);
-})();
+  const userAnswer = parseInt(answerInput.value, 10);
+  if (Number.isNaN(userAnswer)) {
+    feedbackEl.textContent = "أدخل رقمًا صالحًا.";
+    return;
+  }
+
+  if (userAnswer === correctAnswer) {
+    handleCorrectAnswer();
+  } else {
+    handleWrongAnswer();
+  }
+}
+
+function toggleSound() {
+  soundEnabled = !soundEnabled;
+  soundBtn.textContent = soundEnabled ? "تشغيل" : "إيقاف";
+  soundBtn.setAttribute("aria-pressed", String(soundEnabled));
+}
+
+function init() {
+  loadSounds();
+  updatePanel();
+  updateRing();
+}
+
+checkBtn.addEventListener("click", checkAnswer);
+startBtn.addEventListener("click", startGame);
+answerInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    checkAnswer();
+  }
+});
+soundBtn.addEventListener("click", toggleSound);
+
+init();
